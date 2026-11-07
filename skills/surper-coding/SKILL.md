@@ -16,7 +16,11 @@ disable-model-invocation: true
 - **Codex**：启动一次 `wfc relay --detach`，消息会作为新的一轮送到你这里。总控会话用 `danger-full-access` 启动。
 - **OpenCode**：总控会话要用固定端口启动（`opencode <目录> --port <端口>`）。接管后启动一次 `wfc relay --opencode-url … --opencode-session … --detach`，消息会作为新的一轮送到你这里。需要 `wfc` 0.2.0 及以上版本。
 
-两种做法的具体命令和恢复步骤，都在 [router 派发](references/router.md)。
+各宿主的具体命令和恢复步骤，都在 [router 派发](references/router.md)。
+
+## 派给谁
+
+实施者和审查者的宿主与模型由用户在调用时指定，记入账本。用户没有指定时，先问用户，再派发。
 
 ## 审查节奏
 
