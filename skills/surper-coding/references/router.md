@@ -128,8 +128,6 @@ WFC_STATE=<状态目录> wfc relay --opencode-url http://127.0.0.1:<端口> --op
 2. 用 `curl -s http://127.0.0.1:<端口>/session` 列出 `directory` 等于本工作目录的候选会话，再逐个读取 `GET /session/<id>/message`，找出用户消息中含有这个标记的会话。必须恰好命中一个；命中零个或多个时，不要启动 relay，先把身份问题弄清楚。
 3. relay 启动后，核对它投递的第一条消息确实进入了当前会话（这一点和 Codex 一样），然后把确认过的 `ses_…` 写进 `state.md`。和 Codex 一样，把进程号和日志路径写进 `state.md`，全程不要运行 `wait`。每次派发或回复之后结束当前回复，worker 的消息会以 `[router] Messages for the controller:` 开头的新一轮送达。连接被拒（OpenCode 没在监听）时，消息留着下次再送；OpenCode 返回错误或超时时，消息不会重发，`relay.log` 会记成 uncertain，这时去会话里核对是否收到。
 
-OpenCode 当总控时，宿主能力相对有限：账本、标签和审查结论更容易出错。用户或上一级总控应该挑小而低风险的范围给它，并更频繁地回读它的账本。
-
 ## 消息处理
 
 | 消息 | 处理 |
