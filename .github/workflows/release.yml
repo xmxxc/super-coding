@@ -19,7 +19,7 @@ jobs:
         run: python -m unittest discover -s tests
       - name: Pack
         run: |
-          name="surper-coding-${GITHUB_REF_NAME#v}"
+          name="super-coding-${GITHUB_REF_NAME#v}"
           mkdir -p "dist/${name}"
           cp -r skills install.py README.md "dist/${name}/"
           tar -C dist -czf "dist/${name}.tar.gz" "${name}"
@@ -28,6 +28,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          name="surper-coding-${GITHUB_REF_NAME#v}"
+          name="super-coding-${GITHUB_REF_NAME#v}"
           gh release create "${GITHUB_REF_NAME}" "dist/${name}.tar.gz" "dist/${name}.tar.gz.sha256" \
-            --title "surper-coding ${GITHUB_REF_NAME}" --generate-notes
+            --title "super-coding ${GITHUB_REF_NAME}" --generate-notes

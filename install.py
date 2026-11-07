@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Install the surper-coding skills into Claude Code and Codex.
+"""Install the super-coding skills into Claude Code and Codex.
 
   python3 install.py
 
-Installs `surper-coding` (replacing an earlier installed copy) into ~/.claude/skills and
+Installs `super-coding` (replacing an earlier installed copy) into ~/.claude/skills and
 ~/.codex/skills, for each of the two that exists. The prototypes it builds on, `ai-coding` and
 `live-verify`, are installed only where the user has none of their own. A linked development
 install (a symlink) is left alone. The dispatcher, `wfc`, comes from xmxxc/workflow-core.
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-WORKFLOW_SKILL = "surper-coding"
+WORKFLOW_SKILL = "super-coding"
 PROTOTYPES = ("ai-coding", "live-verify")
 
 

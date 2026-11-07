@@ -1,9 +1,9 @@
 # Pinned copies
 
-`ai-coding` and `live-verify` are byte-for-byte copies of the user's skills repository (`/path/to/skills-repo`, commit `9d38b84`). This repository keeps them so that `surper-coding` and its shared rules can be used on their own: `surper-coding` follows the ledger, review, release and label rules of `ai-coding`, and hands formal merge and live acceptance to `live-verify`.
+`ai-coding` and `live-verify` are byte-for-byte copies of the user's skills repository (`/path/to/skills-repo`, commit `9d38b84`). This repository keeps them so that `super-coding` and its shared rules can be used on their own: `super-coding` follows the ledger, review, release and label rules of `ai-coding`, and hands formal merge and live acceptance to `live-verify`.
 
-- Do not edit these copies here. Workflow changes go into `surper-coding` (or `router.py`). Changes to the prototypes go to the skills repository first, and then get re-copied here with a new pin.
-- `install.py` always installs `surper-coding`, and installs `ai-coding` and `live-verify` only where the user has none of their own, so a user's own copies are never replaced and the two never compete for the same skill name.
+- Do not edit these copies here. Workflow changes go into `super-coding` (or `router.py`). Changes to the prototypes go to the skills repository first, and then get re-copied here with a new pin.
+- `install.py` always installs `super-coding`, and installs `ai-coding` and `live-verify` only where the user has none of their own, so a user's own copies are never replaced and the two never compete for the same skill name.
 - Other skills these depend on (`code-review`, `implement`, `tdd` and so on) come from the skills repository and are prerequisites.
 
 SHA-256 at pin time:

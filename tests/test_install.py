@@ -32,8 +32,8 @@ class Install(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         for skills in (claude, codex):
-            self.assertTrue((skills / "surper-coding" / "SKILL.md").is_file())
-            self.assertTrue((skills / "surper-coding" / "scripts" / "ctl.py").is_file())
+            self.assertTrue((skills / "super-coding" / "SKILL.md").is_file())
+            self.assertTrue((skills / "super-coding" / "scripts" / "ctl.py").is_file())
             self.assertTrue((skills / "live-verify" / "SKILL.md").is_file())
         self.assertEqual((claude / "ai-coding" / "SKILL.md").read_text(), "the user's own ai-coding\n")
         self.assertTrue((codex / "ai-coding" / "SKILL.md").is_file())
@@ -42,24 +42,24 @@ class Install(unittest.TestCase):
         skills = self.home / ".claude" / "skills"
         skills.mkdir(parents=True)
         self.run_install()
-        (skills / "surper-coding" / "stale.md").write_text("old\n")
+        (skills / "super-coding" / "stale.md").write_text("old\n")
 
         result = self.run_install()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse((skills / "surper-coding" / "stale.md").exists())
-        self.assertTrue((skills / "surper-coding" / "SKILL.md").is_file())
+        self.assertFalse((skills / "super-coding" / "stale.md").exists())
+        self.assertTrue((skills / "super-coding" / "SKILL.md").is_file())
         self.assertEqual(sorted(p.name for p in skills.iterdir() if p.name.startswith(".")), [])  # no staging or backup left
 
     def test_a_linked_development_install_is_left_alone(self):
         skills = self.home / ".claude" / "skills"
         skills.mkdir(parents=True)
-        (skills / "surper-coding").symlink_to(ROOT / "skills" / "surper-coding")
+        (skills / "super-coding").symlink_to(ROOT / "skills" / "super-coding")
 
         result = self.run_install()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue((skills / "surper-coding").is_symlink())
+        self.assertTrue((skills / "super-coding").is_symlink())
         self.assertIn("left alone", result.stdout)
 
     def test_without_claude_code_or_codex_nothing_is_installed(self):

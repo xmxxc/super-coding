@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-CTL = Path(__file__).resolve().parent.parent / "skills" / "surper-coding" / "scripts" / "ctl.py"
+CTL = Path(__file__).resolve().parent.parent / "skills" / "super-coding" / "scripts" / "ctl.py"
 
 
 def git(cwd, *args):

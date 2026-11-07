@@ -4,7 +4,7 @@
 
 ## 前提
 
-- **wfc 命令**：先运行 `wfc --version` 确认它在 PATH 上，并把版本号记进 `state.md`。如果没有，请用户从 xmxxc/workflow-core 的 Releases 下载 `wfc`，放进 PATH（例如 `~/.local/bin`）。本技能与 `wfc` 分开发布：技能（含 `scripts/ctl.py`）来自 xmxxc/surper-coding。系统要求：Linux 或 macOS（Windows 请用 WSL2），装有 python3 和 tmux。
+- **wfc 命令**：先运行 `wfc --version` 确认它在 PATH 上，并把版本号记进 `state.md`。如果没有，请用户从 xmxxc/workflow-core 的 Releases 下载 `wfc`，放进 PATH（例如 `~/.local/bin`）。本技能与 `wfc` 分开发布：技能（含 `scripts/ctl.py`）来自 xmxxc/super-coding。系统要求：Linux 或 macOS（Windows 请用 WSL2），装有 python3 和 tmux。
 - **状态目录**：每个范围用一个独立的 `WFC_STATE`，例如 `~/.local/state/workflow-core/<仓库>-<范围>`。对这个范围执行的每条 router 命令都要带上它，并把它写进 `state.md`。
 - **同一个 tmux 服务**：每个 worker 在名为 `wfc-<dispatch id>` 的 tmux 会话里运行。总控、worker，以及用户执行 `tmux attach` 时，都要连到同一个 tmux 服务（同一个用户、同一个 `TMUX_TMPDIR`）。看门狗找不到会话，就会报 `exited`。
 - **信任**：
