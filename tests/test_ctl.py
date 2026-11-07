@@ -173,6 +173,23 @@ class Candidate(unittest.TestCase):
         self.assertFalse(result["checks"]["no-secret"]["ok"])
         self.assertIn("128", result["checks"]["no-secret"]["detail"])
 
+    def test_the_secret_never_appears_in_a_command_line(self):
+        head = self.env.commit("a.txt", "1\n", "one")
+        self.env.push()
+        real_git = subprocess.run(["which", "git"], capture_output=True, text=True).stdout.strip()
+        argv_log = self.env.root / "git-argv.log"
+        fake = self.env.bin / "git"
+        fake.write_text(f"#!{sys.executable}\nimport os, sys\n"
+                        f"open({str(argv_log)!r}, 'a').write(' '.join(sys.argv[1:]) + '\\n')\n"
+                        f"os.execv({real_git!r}, [{real_git!r}, *sys.argv[1:]])\n")
+        fake.chmod(0o755)
+
+        result = self.check(head)
+
+        self.assertTrue(result["checks"]["no-secret"]["ok"])
+        self.assertIn("grep", argv_log.read_text())
+        self.assertNotIn("s3cr3t-value", argv_log.read_text())
+
     def test_a_closing_keyword_in_a_commit_fails(self):
         head = self.env.commit("a.txt", "1\n", "one")
         self.env.push()

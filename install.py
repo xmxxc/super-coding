@@ -28,9 +28,19 @@ def install_skill(name, target, replace):
     staging = target / f".{name}.install-new"
     shutil.rmtree(staging, ignore_errors=True)
     shutil.copytree(HERE / "skills" / name, staging)
+    # Swap by renames: the old install stays complete until the new one is in place, and comes
+    # back if putting the new one in place fails.
+    backup = target / f".{name}.install-old"
+    shutil.rmtree(backup, ignore_errors=True)
     if destination.exists():
-        shutil.rmtree(destination)
-    staging.rename(destination)
+        destination.rename(backup)
+    try:
+        staging.rename(destination)
+    except OSError:
+        if backup.exists():
+            backup.rename(destination)
+        raise
+    shutil.rmtree(backup, ignore_errors=True)
     return f"{destination}: installed"
 
 

@@ -48,6 +48,8 @@ class Install(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((skills / "surper-coding" / "stale.md").exists())
+        self.assertTrue((skills / "surper-coding" / "SKILL.md").is_file())
+        self.assertEqual(sorted(p.name for p in skills.iterdir() if p.name.startswith(".")), [])  # no staging or backup left
 
     def test_a_linked_development_install_is_left_alone(self):
         skills = self.home / ".claude" / "skills"

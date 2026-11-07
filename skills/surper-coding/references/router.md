@@ -52,7 +52,7 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
   [--since <上次获审候选>] [--pr <N>] [--secret-file <.env> --secret-key PGPASSWORD] [--comment <id> …] [--port <端口>]
 # 3. 把断网审查者的报告段落转录到 PR（带原作者说明，正文不改）
 <ctl> transcribe --repo <owner/name> --pr <N> --report <r2.md> --start "## 独立复核记录" \
-  [--end "## 最终完整审查状态"] --author "Codex 审查者（router dispatch `d-…`）"
+  [--end "## 最终完整审查状态"] --author 'Codex 审查者（router dispatch `d-…`）'
 # 4. 切换生命周期标签并回读
 <ctl> label --repo <owner/name> --issue <N> --from in-review --to changes-requested
 ```

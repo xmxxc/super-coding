@@ -97,7 +97,9 @@ def cmd_candidate(args):
         checks["no-force-push"] = {"ok": ancestor, "detail": f"{args.since[:12]} {'is' if ancestor else 'is not'} an ancestor"}
     if args.secret_file:
         value = secret_value(args.secret_file, args.secret_key)
-        found = git(repo, "grep", "-l", "-F", "-e", value, head, check=False)
+        # The pattern goes in on stdin, not argv, so the secret never shows in a process listing.
+        found = subprocess.run(["git", "-C", str(repo), "grep", "-l", "-F", "-f", "-", head],
+                               input=value + "\n", capture_output=True, text=True)
         files = [line.split(":", 1)[-1] for line in found.stdout.splitlines()]
         # git grep: 0 = found, 1 = not found, anything else = the scan itself failed (fail closed).
         detail = {0: f"{args.secret_key} value found in: {', '.join(files)}", 1: "not committed"}.get(
