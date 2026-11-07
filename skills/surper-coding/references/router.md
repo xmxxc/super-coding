@@ -117,6 +117,16 @@ WFC_STATE=<状态目录> wfc relay --codex-thread <你的会话 UUID> --detach [
 
 它会输出进程号和日志路径，把它们写进 `state.md`。会话 UUID 的找法：在 `~/.codex/sessions/` 下找包含本会话启动提示原文的 rollout 文件，取第一行的 `id`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。另外，`codex queue` 对不存在的会话 UUID 也会返回成功，所以 relay 启动后，要确认它投递的第一条消息确实到了你这里。如果派发后迟迟没有动静，先在 `relay.log` 和 `router.db` 里看消息是否已经标为送达。
 
+**OpenCode 总控**：总控会话必须用固定端口启动，例如 `opencode <工作目录> --port 4096`（默认端口是随机的，relay 找不到）。接管后执行一次
+
+```sh
+WFC_STATE=<状态目录> wfc relay --opencode-url http://127.0.0.1:<端口> --opencode-session <你的会话 id> --detach [--stall-after <秒>]
+```
+
+会话 id 的找法：`curl -s http://127.0.0.1:<端口>/session`，按 `directory` 等于本会话工作目录、`time.updated` 最新的那一条取 `id`（形如 `ses_…`）。和 Codex 一样，把进程号和日志路径写进 `state.md`，全程不要运行 `wait`。每次派发或回复之后结束当前回复，worker 的消息会以 `[router] Messages for the controller:` 开头的新一轮送达。连接被拒（OpenCode 没在监听）时，消息留着下次再送；OpenCode 返回错误或超时时，消息不会重发，`relay.log` 会记成 uncertain，这时去会话里核对是否收到。
+
+OpenCode 当总控时，宿主能力相对有限：账本、标签和审查结论更容易出错。用户或上一级总控应该挑小而低风险的范围给它，并更频繁地回读它的账本。
+
 ## 消息处理
 
 | 消息 | 处理 |
