@@ -22,7 +22,7 @@ def git(cwd, *args):
 class Env:
     def __init__(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
+        self.root = Path(self.tmp.name).resolve()  # macOS: /var is a symlink to /private/var
         self.origin = self.root / "origin.git"
         subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(self.origin)], check=True)
         self.clone = self.root / "clone"

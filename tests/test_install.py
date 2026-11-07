@@ -15,7 +15,7 @@ class Install(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.home = Path(self.tmp.name)
+        self.home = Path(self.tmp.name).resolve()
 
     def run_install(self):
         return subprocess.run([sys.executable, str(INSTALL)], capture_output=True, text=True,
