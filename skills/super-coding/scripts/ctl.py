@@ -6,7 +6,7 @@
   candidate   check a pushed candidate: remote head, tree, no force-push, no committed secret,
               no closing keywords, record comments exist, the worker's port is free
   transcribe  post one section of an offline reviewer's report to the PR, attributed; a rerun
-              finds the earlier comment by its hidden marker instead of posting again
+              finds its own earlier comment (same account, marker first, same body) instead of posting again
   label       switch a lifecycle label and read it back
 
 Every command prints one JSON object and exits 1 when a check fails. Secret values are never
@@ -144,13 +144,29 @@ def source_label(report):
     return str(report.relative_to(top)) if top else str(report)
 
 
-def find_marked(repo, number, marker):
-    """The URL of the thread's comment carrying `marker`, or None. PR comments are issue comments."""
+def lf(text):
+    """GitHub may hand a body back with CRLF/CR line endings; compare with LF only."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def find_posted(repo, number, marker, expected):
+    """The URL of the comment this transcription already made, or None: written by the current gh
+    login, marker on its first line, body equal to `expected`. A comment that merely quotes the
+    marker (a pasted failure log, someone else's copy, an edited transcript) does not count.
+    PR comments are issue comments."""
+    me = gh("api", "user", "--jq", ".login")
+    if me.returncode != 0 or not me.stdout.strip():
+        raise SystemExit(f"cannot read the current gh login ({me.stderr.strip()}); nothing posted")
     listed = gh("api", f"repos/{repo}/issues/{number}/comments", "--paginate", "--jq", ".[] | @json")
     if listed.returncode != 0:
         raise SystemExit(f"cannot list the comments of #{number} ({listed.stderr.strip()}); nothing posted")
     comments = [json.loads(line) for line in listed.stdout.splitlines() if line.strip()]
-    return next((c["html_url"] for c in comments if marker in (c.get("body") or "")), None)
+    for c in comments:
+        body = lf(c.get("body") or "")
+        if ((c.get("user") or {}).get("login") == me.stdout.strip()
+                and body.split("\n", 1)[0] == marker and body == lf(expected)):
+            return c["html_url"]
+    return None
 
 
 def cmd_transcribe(args):
@@ -163,13 +179,14 @@ def cmd_transcribe(args):
     digest = hashlib.sha256(f"{args.repo}\n{target}\n{source}\n{body}".encode()).hexdigest()[:16]
     marker = f"<!-- ctl:transcribe {digest} -->"
     lines = body.count("\n") + 1
-    existing = find_marked(args.repo, number, marker)
+    # No trailing newline, so a body GitHub trims at the end still compares equal.
+    text = (f"{marker}\n> 总控转录：原作者为 {args.author}，来源为总控账本 `{source}`。"
+            f"{args.why}由总控代为发布，正文未改动。\n\n{body}")
+    existing = find_posted(args.repo, number, marker, text)
     if existing:
         return emit({"url": existing, "lines": lines, "existing": True})
-    header = (f"{marker}\n> 总控转录：原作者为 {args.author}，来源为总控账本 `{source}`。"
-              f"{args.why}由总控代为发布，正文未改动。\n\n")
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
-        f.write(header + body + "\n")
+        f.write(text)
     try:
         kind = ["pr", "comment", str(args.pr)] if args.pr else ["issue", "comment", str(args.issue)]
         posted = gh(*kind, "--repo", args.repo, "--body-file", f.name)
@@ -178,10 +195,11 @@ def cmd_transcribe(args):
     url = posted.stdout.strip().splitlines()[-1] if posted.stdout.strip() else ""
     if posted.returncode != 0 or "#issuecomment-" not in url:
         # GitHub sometimes answers 502/EOF after the comment was created: look before failing.
-        existing = find_marked(args.repo, number, marker)
+        existing = find_posted(args.repo, number, marker, text)
         if existing:
             return emit({"url": existing, "lines": lines, "existing": True})
-        raise SystemExit(f"gh comment failed ({posted.stderr.strip()}) and the thread has no comment with {marker}")
+        raise SystemExit(f"gh comment failed ({posted.stderr.strip()}) and the thread has no comment "
+                         f"from this account that is exactly this transcript ({marker})")
     return emit({"url": url, "lines": lines, "existing": False})
 
 

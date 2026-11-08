@@ -5,6 +5,7 @@ answers from files the test writes."""
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -39,16 +40,21 @@ class Env:
         self.gh_dir.mkdir()
         # The fake gh answers `pr view` from gh/pr.json, `api .../comments/<id>` from gh/comment-<id>.json
         # (exit 1 if missing), `issue view` from gh/labels.json. `pr comment`/`issue comment` append to
-        # gh/thread.json and print the new URL (or, with gh/post-502, create it and still fail);
-        # `api .../issues/<n>/comments` lists gh/thread.json one JSON object per line.
+        # gh/thread.json as the current login and print the new URL (with gh/post-502, create it and
+        # still fail; with gh/post-fails, fail without creating it); `api .../issues/<n>/comments` lists
+        # gh/thread.json one JSON object per line; `api user` answers the login in gh/login (ctl-bot).
         fake = self.bin / "gh"
         fake.write_text(
             f"#!{sys.executable}\nimport json, os, sys\n"
             f"d = {str(self.gh_dir)!r}\n"
             f"open({str(self.calls)!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
             "a = sys.argv[1:]\n"
+            "lp = os.path.join(d, 'login')\n"
+            "login = open(lp).read().strip() if os.path.exists(lp) else 'ctl-bot'\n"
             "if a[:2] == ['pr', 'view']:\n"
             "    print(open(os.path.join(d, 'pr.json')).read())\n"
+            "elif a[:2] == ['api', 'user']:\n"
+            "    print(login if '--jq' in a else json.dumps({'login': login}))\n"
             "elif a[0] == 'api' and '/comments/' in a[1]:\n"
             "    p = os.path.join(d, 'comment-' + a[1].rsplit('/', 1)[1] + '.json')\n"
             "    if not os.path.exists(p): sys.exit(1)\n"
@@ -60,10 +66,12 @@ class Env:
             "elif a[:2] in (['pr', 'comment'], ['issue', 'comment']):\n"
             "    body = open(a[a.index('--body-file') + 1]).read()\n"
             "    open(os.path.join(d, 'posted.md'), 'w').write(body)\n"
+            "    if os.path.exists(os.path.join(d, 'post-fails')):\n"
+            "        sys.stderr.write('HTTP 502: Bad Gateway\\n'); sys.exit(1)\n"
             "    t = os.path.join(d, 'thread.json')\n"
             "    thread = json.load(open(t)) if os.path.exists(t) else []\n"
             "    url = 'https://github.com/o/r/pull/1#issuecomment-' + str(99 + len(thread))\n"
-            "    json.dump(thread + [{'html_url': url, 'body': body}], open(t, 'w'))\n"
+            "    json.dump(thread + [{'html_url': url, 'body': body, 'user': {'login': login}}], open(t, 'w'))\n"
             "    if os.path.exists(os.path.join(d, 'post-502')):\n"
             "        sys.stderr.write('HTTP 502: Bad Gateway\\n'); sys.exit(1)\n"
             "    print(url)\n"
@@ -369,15 +377,83 @@ class Transcribe(unittest.TestCase):
         self.assertEqual(len(self.thread()), 1)
 
     def test_a_failed_post_that_left_no_comment_fails(self):
-        (self.env.gh_dir / "post-502").touch()
-        fake = self.env.bin / "gh"
-        fake.write_text(fake.read_text().replace("json.dump(thread + ", "0 and json.dump(thread + "))
+        (self.env.gh_dir / "post-fails").touch()
 
         result = self.env.run("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),
                               "--start", "## 独立复核记录", "--author", "x")
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("502", result.stderr)
+
+    def set_thread(self, comments):
+        (self.env.gh_dir / "thread.json").write_text(json.dumps(comments))
+
+    def test_a_comment_quoting_the_marker_or_the_failure_log_is_not_the_transcript(self):
+        (self.env.gh_dir / "post-fails").touch()
+        failed = self.env.run("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),
+                              "--start", "## 独立复核记录", "--end", "## 最终完整审查状态", "--author", "x")
+        marker = re.search(r"<!-- ctl:transcribe [0-9a-f]{16} -->", failed.stderr).group(0)
+        # Pasted by the operator under the same gh account, and by someone else with the marker first.
+        self.set_thread([
+            {"html_url": "https://github.com/o/r/pull/1#issuecomment-7", "user": {"login": "ctl-bot"},
+             "body": "transcribe failed:\n```\n" + failed.stderr + "```\n"},
+            {"html_url": "https://github.com/o/r/pull/1#issuecomment-8", "user": {"login": "ctl-bot"},
+             "body": marker + "\nsee the failure above"},
+        ])
+
+        again = self.env.run("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),
+                             "--start", "## 独立复核记录", "--end", "## 最终完整审查状态", "--author", "x")
+        self.assertNotEqual(again.returncode, 0)
+
+        (self.env.gh_dir / "post-fails").unlink()
+        result = self.transcribe()
+        self.assertFalse(result["existing"])
+        self.assertEqual(len(self.thread()), 3)
+
+    def test_an_edited_transcript_is_not_the_transcript(self):
+        self.transcribe()
+        thread = self.thread()
+        thread[0]["body"] = thread[0]["body"].replace("V1", "V2")
+        self.set_thread(thread)
+
+        result = self.transcribe()
+
+        self.assertFalse(result["existing"])
+        self.assertEqual(len(self.thread()), 2)
+
+    def test_a_transcript_by_another_account_is_not_the_transcript(self):
+        self.transcribe()
+        thread = self.thread()
+        thread[0]["user"]["login"] = "someone-else"
+        self.set_thread(thread)
+
+        result = self.transcribe()
+
+        self.assertFalse(result["existing"])
+        self.assertEqual(len(self.thread()), 2)
+
+    def test_a_502_does_not_count_a_quoted_marker_as_posted(self):
+        self.transcribe()
+        thread = self.thread()
+        thread[0]["user"]["login"] = "someone-else"
+        self.set_thread(thread)
+        (self.env.gh_dir / "post-fails").touch()
+
+        result = self.env.run("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),
+                              "--start", "## 独立复核记录", "--end", "## 最终完整审查状态", "--author", "x")
+
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_crlf_line_endings_from_github_still_match(self):
+        first = self.transcribe()
+        thread = self.thread()
+        thread[0]["body"] = thread[0]["body"].replace("\n", "\r\n")
+        self.set_thread(thread)
+
+        again = self.transcribe()
+
+        self.assertTrue(again["existing"])
+        self.assertEqual(again["url"], first["url"])
 
     def test_an_unreadable_thread_posts_nothing(self):
         (self.env.gh_dir / "list-fails").touch()

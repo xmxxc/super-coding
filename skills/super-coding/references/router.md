@@ -57,7 +57,7 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
 <ctl> label --repo <owner/name> --issue <N> --from in-review --to changes-requested
 ```
 
-`checks` 在快照有本地改动时会拒绝执行。`candidate` 不会打印密钥的值。`transcribe` 是幂等的：评论正文带隐藏标记 `<!-- ctl:transcribe <标记> -->`，标记由仓库、目标编号、来源报告路径和转录段落确定。发之前先找帖子里有没有同一标记的评论，有就直接返回它的 URL 并注明 `"existing": true`。发送报错（例如 GitHub 偶尔返回的 502 或 EOF）后会再查一次帖子，评论其实已经发出时同样按成功返回。所以失败后可以直接重跑，不会产生重复评论。
+`checks` 在快照有本地改动时会拒绝执行。`candidate` 不会打印密钥的值。`transcribe` 是幂等的：评论正文带隐藏标记 `<!-- ctl:transcribe <标记> -->`，标记由仓库、目标编号、来源报告路径和转录段落确定。发之前先在帖子里找这次转录自己发过的评论：作者是当前 gh 身份（`gh api user`），正文第一行就是标记行，整段正文与这次要发的完全相同（只统一行尾）。找到就直接返回它的 URL 并注明 `"existing": true`。发送报错（例如 GitHub 偶尔返回的 502 或 EOF）后按同样的条件再查一次，评论其实已经发出时同样按成功返回。只是引用了标记的评论（贴出的失败日志、别人复制的标记、改过的正文）不算已发布。所以失败后可以直接重跑，不会产生重复评论，也不会把没发出的转录误报为成功。
 
 ### 状态与证据
 
