@@ -38,7 +38,9 @@ class Env:
         self.gh_dir = self.root / "gh"
         self.gh_dir.mkdir()
         # The fake gh answers `pr view` from gh/pr.json, `api .../comments/<id>` from gh/comment-<id>.json
-        # (exit 1 if missing), `issue view` from gh/labels.json; `pr comment`/`issue comment` print a URL.
+        # (exit 1 if missing), `issue view` from gh/labels.json. `pr comment`/`issue comment` append to
+        # gh/thread.json and print the new URL (or, with gh/post-502, create it and still fail);
+        # `api .../issues/<n>/comments` lists gh/thread.json one JSON object per line.
         fake = self.bin / "gh"
         fake.write_text(
             f"#!{sys.executable}\nimport json, os, sys\n"
@@ -51,10 +53,20 @@ class Env:
             "    p = os.path.join(d, 'comment-' + a[1].rsplit('/', 1)[1] + '.json')\n"
             "    if not os.path.exists(p): sys.exit(1)\n"
             "    print(open(p).read())\n"
+            "elif a[0] == 'api' and a[1].endswith('/comments'):\n"
+            "    if os.path.exists(os.path.join(d, 'list-fails')): sys.exit(1)\n"
+            "    t = os.path.join(d, 'thread.json')\n"
+            "    for c in (json.load(open(t)) if os.path.exists(t) else []): print(json.dumps(c))\n"
             "elif a[:2] in (['pr', 'comment'], ['issue', 'comment']):\n"
             "    body = open(a[a.index('--body-file') + 1]).read()\n"
             "    open(os.path.join(d, 'posted.md'), 'w').write(body)\n"
-            "    print('https://github.com/o/r/pull/1#issuecomment-99')\n"
+            "    t = os.path.join(d, 'thread.json')\n"
+            "    thread = json.load(open(t)) if os.path.exists(t) else []\n"
+            "    url = 'https://github.com/o/r/pull/1#issuecomment-' + str(99 + len(thread))\n"
+            "    json.dump(thread + [{'html_url': url, 'body': body}], open(t, 'w'))\n"
+            "    if os.path.exists(os.path.join(d, 'post-502')):\n"
+            "        sys.stderr.write('HTTP 502: Bad Gateway\\n'); sys.exit(1)\n"
+            "    print(url)\n"
             "elif a[:2] == ['issue', 'edit']:\n"
             "    labels = json.load(open(os.path.join(d, 'labels.json')))\n"
             "    for i, x in enumerate(a):\n"
@@ -311,9 +323,70 @@ class Transcribe(unittest.TestCase):
 
         posted = (self.env.gh_dir / "posted.md").read_text()
         self.assertEqual(result["url"], "https://github.com/o/r/pull/1#issuecomment-99")
-        self.assertTrue(posted.startswith("> 总控转录：原作者为 Codex 审查者（router dispatch `d-1`）"))
+        self.assertIn("\n> 总控转录：原作者为 Codex 审查者（router dispatch `d-1`）", posted)
         self.assertIn("## 独立复核记录 · 第2轮\nbody line\n\n### Spec\nV1", posted)
         self.assertNotIn("not run", posted)
+
+    def transcribe(self, *extra, ok=True):
+        return self.env.json("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),
+                             "--start", "## 独立复核记录", "--end", "## 最终完整审查状态", "--author", "x",
+                             *extra, ok=ok)
+
+    def thread(self):
+        return json.loads((self.env.gh_dir / "thread.json").read_text())
+
+    def test_a_first_post_carries_a_hidden_marker_and_is_not_existing(self):
+        result = self.transcribe()
+
+        self.assertFalse(result["existing"])
+        self.assertRegex(self.thread()[0]["body"], r"^<!-- ctl:transcribe [0-9a-f]{16} -->\n> 总控转录")
+
+    def test_a_rerun_returns_the_existing_comment_instead_of_posting_again(self):
+        first = self.transcribe()
+        again = self.transcribe()
+
+        self.assertEqual(len(self.thread()), 1)
+        self.assertEqual(again["url"], first["url"])
+        self.assertTrue(again["existing"])
+
+    def test_another_section_or_target_gets_another_marker(self):
+        self.transcribe()
+        self.env.json("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),
+                      "--start", "## 最终完整审查状态", "--author", "x")
+        self.env.json("transcribe", "--repo", "o/r", "--issue", "2", "--report", str(self.report),
+                      "--start", "## 独立复核记录", "--end", "## 最终完整审查状态", "--author", "x")
+
+        markers = {c["body"].splitlines()[0] for c in self.thread()}
+        self.assertEqual(len(markers), 3)
+
+    def test_a_502_after_the_comment_was_created_counts_as_posted(self):
+        (self.env.gh_dir / "post-502").touch()
+
+        result = self.transcribe()
+
+        self.assertEqual(result["url"], self.thread()[0]["html_url"])
+        self.assertTrue(result["existing"])
+        self.assertEqual(len(self.thread()), 1)
+
+    def test_a_failed_post_that_left_no_comment_fails(self):
+        (self.env.gh_dir / "post-502").touch()
+        fake = self.env.bin / "gh"
+        fake.write_text(fake.read_text().replace("json.dump(thread + ", "0 and json.dump(thread + "))
+
+        result = self.env.run("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),
+                              "--start", "## 独立复核记录", "--author", "x")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("502", result.stderr)
+
+    def test_an_unreadable_thread_posts_nothing(self):
+        (self.env.gh_dir / "list-fails").touch()
+
+        result = self.env.run("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),
+                              "--start", "## 独立复核记录", "--author", "x")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.env.gh_dir / "posted.md").exists())
 
     def test_a_missing_heading_posts_nothing(self):
         result = self.env.run("transcribe", "--repo", "o/r", "--pr", "1", "--report", str(self.report),

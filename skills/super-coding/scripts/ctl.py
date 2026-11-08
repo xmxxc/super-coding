@@ -5,7 +5,8 @@
               logging each command's real exit code
   candidate   check a pushed candidate: remote head, tree, no force-push, no committed secret,
               no closing keywords, record comments exist, the worker's port is free
-  transcribe  post one section of an offline reviewer's report to the PR, attributed
+  transcribe  post one section of an offline reviewer's report to the PR, attributed; a rerun
+              finds the earlier comment by its hidden marker instead of posting again
   label       switch a lifecycle label and read it back
 
 Every command prints one JSON object and exits 1 when a check fails. Secret values are never
@@ -14,6 +15,7 @@ printed. Uses git and gh; Python standard library only.
 
 import argparse
 import fcntl
+import hashlib
 import json
 import re
 import socket
@@ -142,10 +144,29 @@ def source_label(report):
     return str(report.relative_to(top)) if top else str(report)
 
 
+def find_marked(repo, number, marker):
+    """The URL of the thread's comment carrying `marker`, or None. PR comments are issue comments."""
+    listed = gh("api", f"repos/{repo}/issues/{number}/comments", "--paginate", "--jq", ".[] | @json")
+    if listed.returncode != 0:
+        raise SystemExit(f"cannot list the comments of #{number} ({listed.stderr.strip()}); nothing posted")
+    comments = [json.loads(line) for line in listed.stdout.splitlines() if line.strip()]
+    return next((c["html_url"] for c in comments if marker in (c.get("body") or "")), None)
+
+
 def cmd_transcribe(args):
     report = Path(args.report).resolve()
     body = section(report.read_text(), args.start, args.end)
-    header = (f"> 总控转录：原作者为 {args.author}，来源为总控账本 `{source_label(report)}`。"
+    source = source_label(report)
+    target = f"pr #{args.pr}" if args.pr else f"issue #{args.issue}"
+    number = args.pr or args.issue
+    # Same target + source + section text -> same marker, so a rerun finds the comment it already made.
+    digest = hashlib.sha256(f"{args.repo}\n{target}\n{source}\n{body}".encode()).hexdigest()[:16]
+    marker = f"<!-- ctl:transcribe {digest} -->"
+    lines = body.count("\n") + 1
+    existing = find_marked(args.repo, number, marker)
+    if existing:
+        return emit({"url": existing, "lines": lines, "existing": True})
+    header = (f"{marker}\n> 总控转录：原作者为 {args.author}，来源为总控账本 `{source}`。"
               f"{args.why}由总控代为发布，正文未改动。\n\n")
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
         f.write(header + body + "\n")
@@ -156,9 +177,12 @@ def cmd_transcribe(args):
         Path(f.name).unlink()
     url = posted.stdout.strip().splitlines()[-1] if posted.stdout.strip() else ""
     if posted.returncode != 0 or "#issuecomment-" not in url:
-        # GitHub sometimes answers 502/EOF after the comment was created: look before retrying.
-        raise SystemExit(f"gh comment failed ({posted.stderr.strip()}); check the thread before posting again")
-    return emit({"url": url, "lines": body.count("\n") + 1})
+        # GitHub sometimes answers 502/EOF after the comment was created: look before failing.
+        existing = find_marked(args.repo, number, marker)
+        if existing:
+            return emit({"url": existing, "lines": lines, "existing": True})
+        raise SystemExit(f"gh comment failed ({posted.stderr.strip()}) and the thread has no comment with {marker}")
+    return emit({"url": url, "lines": lines, "existing": False})
 
 
 def cmd_label(args):
