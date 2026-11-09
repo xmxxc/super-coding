@@ -33,7 +33,7 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
 派发之前，先准备两样东西，都放进它的回报目录：
 
 - 在固定快照上执行项目的全量检查（安装、类型检查、lint、格式、测试），保存日志，并记录每条命令真实的退出码；
-- 需求来源，也就是 Issue 和 spec 的正文。
+- 需求来源，也就是 Issue 和 spec 正文的本地副本。它的沙箱不能联网，读不到 GitHub，所以任务文件里要写明这些副本的路径。
 
 审查结论写进报告，标为"待发布"。由你注明原作者后，转录到 PR 上。
 
@@ -80,6 +80,12 @@ WFC_STATE=<状态目录> wfc continue <dispatch> --task <下一轮任务文件> 
 - **何时可以续派**：只有在该 dispatch 已经对当前任务报告 `done` 之后才行。`continue` 发现上一轮还没有 `done`，会直接报错。
 - **会话已经结束**（`exited`、误关或被 Ctrl-C）：用 `resume` 把 worker 重新拉回它原来的宿主会话，上下文都还在。会话结束时，`continue` 会直接报错，不会把任务打进去。
 - **原会话不再合适**（例如宿主配置已经改了）：新派一个会话，在任务文件里写明真实的起点。
+- **改派**：任务从一个宿主改派给另一个宿主时（例如 Codex 额度耗尽，改给 Claude），新任务文件必须写明：
+  - 原任务文件；
+  - 当前分支和 head；
+  - 已有的 diff，未提交的部分是保留还是丢弃；
+  - 已有报告所在的目录；
+  - 旧 dispatch 记为 `stale` 的原因。
 - **最后一轮增量复核**：预计能通过时，可以在同一个任务里写两步，先增量复核，无阻塞时紧接着做最终完整审查，两份记录分开写。有阻塞就只做第一步。
 
 ## 恢复会话：resume
@@ -107,7 +113,7 @@ WFC_STATE=<状态目录> wfc resume <dispatch> [--task <下一轮任务文件> -
 WFC_STATE=<状态目录> wfc wait --timeout <秒> [--stall-after <秒>]
 ```
 
-然后结束当前回复。同一时刻只保留一个 `wait`。用户在窗口里发言也会唤醒你；回应完用户后，确认后台的 `wait` 还在。`wait` 以退出码 3 返回，表示超时：回读各任务的现场，有进展就重新挂 `wait`，没有进展的任务记为 `blocked`。
+然后结束当前回复。同一时刻只保留一个 `wait`。用户在窗口里发言也会唤醒你；回应完用户后，确认后台的 `wait` 还在。`wait` 以退出码 3 返回，表示超时：先用 `wfc status` 查看，再回读各任务的现场，有进展就重新挂 `wait`，没有进展的任务记为 `blocked`。
 
 **Codex 总控**：总控会话用 `danger-full-access` 启动。接管后执行一次
 
@@ -115,7 +121,7 @@ WFC_STATE=<状态目录> wfc wait --timeout <秒> [--stall-after <秒>]
 WFC_STATE=<状态目录> wfc relay --codex-thread <你的会话 UUID> --detach [--stall-after <秒>]
 ```
 
-它会输出进程号和日志路径，把它们写进 `state.md`。会话 UUID 的找法：在 `~/.codex/sessions/` 下找包含本会话启动提示原文的 rollout 文件，取第一行的 `id`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。另外，`codex queue` 对不存在的会话 UUID 也会返回成功，所以 relay 启动后，要确认它投递的第一条消息确实到了你这里。如果派发后迟迟没有动静，先在 `relay.log` 和 `router.db` 里看消息是否已经标为送达。
+它会输出进程号和日志路径，把它们写进 `state.md`。会话 UUID 的找法：在 `~/.codex/sessions/` 下找包含本会话启动提示原文的 rollout 文件，取第一行的 `id`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。另外，`codex queue` 对不存在的会话 UUID 也会返回成功，所以 relay 启动后，要确认它投递的第一条消息确实到了你这里。如果派发后迟迟没有动静，先用 `wfc status` 和 `relay.log` 看消息是否已经标为送达。
 
 **OpenCode 总控**：总控会话必须用固定端口启动，例如 `opencode <工作目录> --port 4096`（默认端口是随机的，relay 找不到）。接管后执行一次
 
@@ -128,13 +134,22 @@ WFC_STATE=<状态目录> wfc relay --opencode-url http://127.0.0.1:<端口> --op
 2. 用 `curl -s http://127.0.0.1:<端口>/session` 列出 `directory` 等于本工作目录的候选会话，再逐个读取 `GET /session/<id>/message`，找出用户消息中含有这个标记的会话。必须恰好命中一个；命中零个或多个时，不要启动 relay，先把身份问题弄清楚。
 3. relay 启动后，核对它投递的第一条消息确实进入了当前会话（这一点和 Codex 一样），然后把确认过的 `ses_…` 写进 `state.md`。和 Codex 一样，把进程号和日志路径写进 `state.md`，全程不要运行 `wait`。每次派发或回复之后结束当前回复，worker 的消息会以 `[router] Messages for the controller:` 开头的新一轮送达。连接被拒（OpenCode 没在监听）时，消息留着下次再送；OpenCode 返回错误或超时时，消息不会重发，`relay.log` 会记成 uncertain，这时去会话里核对是否收到。
 
+**查看状态**：`wait` 超时，或者怀疑丢了消息时，先运行
+
+```sh
+WFC_STATE=<状态目录> wfc status [--dispatch <id>]
+```
+
+它只读不取消息，列出每个 dispatch 的状态（`working`、`asking`、`done`、`exited`）、最后一条消息、画面静止的秒数，以及还没送达的消息和正在运行的 `wait` 或 relay；带 `--dispatch` 时附上这个 dispatch 的全部消息。不要直接查 `router.db`。
+
 ## 消息处理
 
 | 消息 | 处理 |
 | --- | --- |
 | `done` | 完成 `returned` 的回读核对。缺留痕的，按账本补发转录，或者交回 worker 补发 |
 | `question`（由 `ask` 发出） | 在已固定的范围、验收条件和授权内能回答的，直接执行 `wfc reply <消息 id> "<答案>"`。需要用户决定的，把原问题和选项原样转给用户。问题和答案都记入账本 |
-| `stalled` | 先读附带的画面。<br>停在信任或权限提示上：请用户执行 `tmux attach -t wfc-<id>` 处理，该任务记为 `blocked`。同时告诉用户怎么离开：按 Ctrl-b 再按 d；如果终端截获了 Ctrl-b（例如 VS Code 的终端），就在另一个终端执行 `tmux detach-client -s wfc-<id>`，或者让总控代为执行。千万不要按 Ctrl-C，那会直接退出 worker。<br>停下了，但没报告也没提问（例如模型调用遇到网络错误）：回读现场，然后用 `tmux send-keys -t wfc-<id> -l "<提醒>"` 打一行提醒，隔半秒再发 `Enter`，并把这次介入记入账本。提醒之后再次报 `stalled` 的，记为 `blocked` |
+| `stalled` | 先读附带的画面。<br>停在信任或权限提示上：请用户执行 `tmux attach -t wfc-<id>` 处理，该任务记为 `blocked`。同时告诉用户怎么离开：按 Ctrl-b 再按 d；如果终端截获了 Ctrl-b（例如 VS Code 的终端），就在另一个终端执行 `tmux detach-client -s wfc-<id>`，或者让总控代为执行。千万不要按 Ctrl-C，那会直接退出 worker。<br>停下了，但没报告也没提问（例如模型调用遇到网络错误）：回读现场，然后用 `WFC_STATE=<状态目录> wfc nudge <dispatch> --text "<提醒>"` 打一行提醒，并把这次介入记入账本。提醒之后再次报 `stalled` 的，记为 `blocked` |
+| `blocked` | worker 的本轮因宿主报错而结束。消息附带宿主的错误类型 `kind` 和原文 `message`，按类型处理：<br>额度耗尽（`usage_limit_exceeded`、`rate_limit`）：按原文里的恢复时间等待，到时用 `wfc nudge <dispatch> --text "<提醒>"` 让它接着做；或者请用户决定是否改派（见上面的改派）。等待期间该任务记为 `blocked`，写明恢复时间。<br>短暂故障（`server_overloaded`、5xx）：过一会儿再 `nudge`。<br>内容策略（`cyber_policy`）：调整任务措辞后再发给它。<br>每次处理都记入账本 |
 | `exited` | 先检查 worker 退出前是否已经提交或推送，再用 `resume <dispatch>` 让它回到原会话，接着做当前任务，并记入账本。`resume` 找不到会话或者再次 `exited` 时，按账本的失效规则处理：记为 `stale`，保留现场，用下一轮编号新派，在新任务文件里写明真实起点，以及旧现场是续用还是放弃 |
 
 每条消息都带 dispatch id，对照账本找到它所属的票和任务。记为 `blocked` 的任务，在 `state.md` 写清楚在等谁、要做什么、结果交回哪里。
@@ -151,5 +166,5 @@ WFC_STATE=<状态目录> wfc relay --opencode-url http://127.0.0.1:<端口> --op
 2. 找回上次已经取走的消息：
    - Claude Code：读上一次后台 `wait` 的输出；
    - Codex：用记录的进程号确认旧 relay 的状态，仍在运行但指向旧会话的，停掉它。
-3. 把账本与 `<状态目录>/router.db` 的 `message` 表、`relay.log`、`tmux ls` 列出的 `wfc-*` 会话逐一对照。已经送达但账本里还没处理的消息，按上面的消息处理表补做。
+3. 把账本与 `wfc status` 的输出（需要某个 dispatch 的全部消息时加 `--dispatch <id>`）、`relay.log`、`tmux ls` 列出的 `wfc-*` 会话逐一对照。已经送达但账本里还没处理的消息，按上面的消息处理表补做。
 4. 重新挂 `wait`，或者用当前会话的 UUID 重新启动唯一的一个 relay。
