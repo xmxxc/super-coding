@@ -123,10 +123,10 @@ WFC_STATE=<状态目录> wfc wait --timeout <秒> [--stall-after <秒>]
 **Codex 总控**：总控会话用 `danger-full-access` 启动。接管后执行一次
 
 ```sh
-WFC_STATE=<状态目录> wfc relay --codex-thread <你的会话 UUID> --detach [--stall-after <秒>]
+WFC_STATE=<状态目录> wfc relay --codex --detach [--stall-after <秒>]
 ```
 
-它会输出进程号和日志路径，把它们写进 `state.md`。会话 UUID 的找法：在 `~/.codex/sessions/` 下找包含本会话启动提示原文的 rollout 文件，取第一行的 `id`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。另外，`codex queue` 对不存在的会话 UUID 也会返回成功，所以 relay 启动后，要确认它投递的第一条消息确实到了你这里。如果派发后迟迟没有动静，先用 `wfc status` 和 `relay.log` 看消息是否已经标为送达。
+`--codex` 从 Codex 为命令设置的 `CODEX_THREAD_ID` 取本会话的线程，并在启动前核对对应的 rollout，所以必须在总控会话自己的命令里运行。它会输出进程号和日志路径，把它们写进 `state.md`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。relay 启动后，要确认它投递的第一条消息确实到了你这里。relay 报 `no rollout found` 并退出（启动时拒绝，或投递时 `codex queue` 找不到会话）时，说明线程不对：回头检查是不是在总控会话里运行的，不要换个 ID 硬试。如果派发后迟迟没有动静，先用 `wfc status` 和 `relay.log` 看消息是否已经标为送达。
 
 **OpenCode 总控**：总控会话必须用固定端口启动，例如 `opencode <工作目录> --port 4096`（默认端口是随机的，relay 找不到）。接管后执行一次
 
@@ -172,4 +172,4 @@ WFC_STATE=<状态目录> wfc status [--dispatch <id>]
    - Claude Code：读上一次后台 `wait` 的输出；
    - Codex：用记录的进程号确认旧 relay 的状态，仍在运行但指向旧会话的，停掉它。
 3. 把账本与 `wfc status` 的输出（需要某个 dispatch 的全部消息时加 `--dispatch <id>`）、`relay.log`、`tmux ls` 列出的 `wfc-*` 会话逐一对照。已经送达但账本里还没处理的消息，按上面的消息处理表补做。
-4. 重新挂 `wait`，或者用当前会话的 UUID 重新启动唯一的一个 relay。
+4. 重新挂 `wait`，或者在当前会话里用 `wfc relay --codex --detach` 重新启动唯一的一个 relay。
