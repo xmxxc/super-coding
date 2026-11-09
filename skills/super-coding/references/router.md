@@ -28,8 +28,8 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
   - Codex：`workspace-write` 沙箱，不请求审批，默认不能联网，带 `--network` 时可以联网；
   - OpenCode：工作目录外的路径一律放行，没有目录限制，可以联网；
   - Claude Code：`auto` 模式，可以联网。
-- **联网**：`--network` 只对 Codex 生效，其他宿主本来就能联网，`dispatch` 会把它列在 `ignored` 里。无人值守的 worker 默认断网，用之前先想清楚为什么需要联网，并把理由记进账本。`--effort` 和 `--network` 都随 dispatch 记录，`resume` 时沿用，不需要在工作树里写 `.codex/config.toml`。
-- **本地提交（`--git`）**：Codex 的沙箱默认不能在链接 worktree 里提交。Codex 实施者需要自己做本地提交时才带 `--git`，例如有多次提交的票。开启后，worker 能改主仓库 `.git` 下的所有内容，不只是自己的分支。push、开 PR 和发评论仍然由你来做。不带 `--git` 时，提交由你代做。Claude Code 和 OpenCode 本来就能写 `.git`，会忽略这个参数。
+- **联网**：`--network` 只对 Codex 生效，其他宿主本来就能联网，`dispatch` 会把它列在 `ignored` 里。Codex worker 默认断网，用之前先想清楚为什么需要联网，并把理由记进账本。`--effort` 和 `--network` 都随 dispatch 记录，`resume` 时沿用，不需要在工作树里写 `.codex/config.toml`。
+- **本地提交（`--git`）**：Codex 的沙箱默认不能在链接 worktree 里提交。Codex 实施者需要自己做本地提交时才带 `--git`，例如有多次提交的票。开启后，worker 能改主仓库 `.git` 下的所有内容，不只是自己的分支。Codex worker 没有凭据，沙箱默认也不联网，所以推送、开 PR 和发评论由你代做；带 `--git` 也只是允许本地提交。不带 `--git` 时，Codex 实施者的提交也由你代做。Claude Code 和 OpenCode 本来就能写 `.git`，会忽略这个参数。
 - 需要推送分支、建 PR 或发评论的任务，派给能联网的宿主；或者在你的授权范围内由你代发。
 - worker 完工用 `done` 报告，需要决定时用 `ask` 提问。这两条命令的用法由 router 写进 worker 的说明。
 
