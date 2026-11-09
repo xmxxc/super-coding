@@ -15,16 +15,21 @@
 ## 派发
 
 ```sh
-WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <模型>] \
+WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <模型>] [--effort <强度>] \
+  [--network] [--git] [--label "<项目> | <票> | <角色>"] \
   --task <prompts/ 中任务文件的绝对路径> --cwd <工作树> --report <reports/<票>-<角色>/r<N>.md>
 ```
 
 - **回报目录按会话划分**：同一个 dispatch 的各轮回报都放在一个目录里，例如 `reports/2-impl/r1.md`、`reports/2-impl/r2.md`。router 只在派发时把这个目录开放给 worker 写入，所以 `continue` 也只接受这个目录里的路径。
+- **会话标签**：回报目录按 `reports/<票>-<角色>/` 命名。router 在目录名的最后一个 `-` 处切出票和角色，加上项目名，组成默认标签"项目 | 票 | 角色"，用作 tmux 窗口名和 Claude Code 的会话名，`status` 里也会显示。需要时用 `--label` 覆盖。
+- **推理强度**：用 `--effort <强度>` 指定，router 把它映射到各宿主自己的参数，强度的取值也按宿主自己的。
 - **派给 OpenCode 时必须带 `--model`**，因为它的默认模型可能是受限的免费模型。
 - **无人值守下的权限**：
-  - Codex：`workspace-write` 沙箱，不请求审批，默认不能联网；
+  - Codex：`workspace-write` 沙箱，不请求审批，默认不能联网，带 `--network` 时可以联网；
   - OpenCode：工作目录外的路径一律放行，没有目录限制，可以联网；
   - Claude Code：`auto` 模式，可以联网。
+- **联网**：`--network` 只对 Codex 生效，其他宿主本来就能联网，`dispatch` 会把它列在 `ignored` 里。无人值守的 worker 默认断网，用之前先想清楚为什么需要联网，并把理由记进账本。`--effort` 和 `--network` 都随 dispatch 记录，`resume` 时沿用，不需要在工作树里写 `.codex/config.toml`。
+- **本地提交（`--git`）**：Codex 的沙箱默认不能在链接 worktree 里提交。Codex 实施者需要自己做本地提交时才带 `--git`，例如有多次提交的票。开启后，worker 能改主仓库 `.git` 下的所有内容，不只是自己的分支。push、开 PR 和发评论仍然由你来做。不带 `--git` 时，提交由你代做。Claude Code 和 OpenCode 本来就能写 `.git`，会忽略这个参数。
 - 需要推送分支、建 PR 或发评论的任务，派给能联网的宿主；或者在你的授权范围内由你代发。
 - worker 完工用 `done` 报告，需要决定时用 `ask` 提问。这两条命令的用法由 router 写进 worker 的说明。
 
@@ -65,7 +70,7 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
 | --- | --- |
 | `pending-handoff` | `dispatch` 或 `continue` 已经成功返回 |
 | `accepted` | 收到该 dispatch 的消息，或者 `tmux capture-pane -p -t wfc-<id>` 显示它已经开始处理本轮任务 |
-| `returned` | 收到本轮的 `done`，并且按 [账本](../../ai-coding/references/ledger.md) 完成了回读核对 |
+| `returned` | 收到本轮的 `done`，并且按 [账本](../../ai-coding/references/ledger.md) 完成了回读核对，包括 `done` 消息里的 `head` 和 `dirty` |
 
 **独立性**：实施和审查分别派发。dispatch id 不同，就是不同的宿主会话、各自的上下文。各个 worker 能读到同一个状态库，OpenCode 还能写任意路径，所以文件隔离不能作为独立性的证据。审查者的 `--cwd` 用固定快照或独立的工作树。
 
@@ -146,7 +151,7 @@ WFC_STATE=<状态目录> wfc status [--dispatch <id>]
 
 | 消息 | 处理 |
 | --- | --- |
-| `done` | 完成 `returned` 的回读核对。缺留痕的，按账本补发转录，或者交回 worker 补发 |
+| `done` | 完成 `returned` 的回读核对。拿消息里的 `head` 和报告里写的 head 比对，再看 `dirty` 是否符合预期（例如由你代提交时，工作树应当有未提交的改动）；对不上就按不一致处理，记进账本。两者为 `null` 表示 router 没读到 git 状态，这时到工作树里自己回读。缺留痕的，按账本补发转录，或者交回 worker 补发 |
 | `question`（由 `ask` 发出） | 在已固定的范围、验收条件和授权内能回答的，直接执行 `wfc reply <消息 id> "<答案>"`。需要用户决定的，把原问题和选项原样转给用户。问题和答案都记入账本 |
 | `stalled` | 先读附带的画面。<br>停在信任或权限提示上：请用户执行 `tmux attach -t wfc-<id>` 处理，该任务记为 `blocked`。同时告诉用户怎么离开：按 Ctrl-b 再按 d；如果终端截获了 Ctrl-b（例如 VS Code 的终端），就在另一个终端执行 `tmux detach-client -s wfc-<id>`，或者让总控代为执行。千万不要按 Ctrl-C，那会直接退出 worker。<br>停下了，但没报告也没提问（例如模型调用遇到网络错误）：回读现场，然后用 `WFC_STATE=<状态目录> wfc nudge <dispatch> --text "<提醒>"` 打一行提醒，并把这次介入记入账本。提醒之后再次报 `stalled` 的，记为 `blocked` |
 | `blocked` | worker 的本轮因宿主报错而结束。消息附带宿主的错误类型 `kind` 和原文 `message`，按类型处理：<br>额度耗尽（`usage_limit_exceeded`、`rate_limit`）：按原文里的恢复时间等待，到时用 `wfc nudge <dispatch> --text "<提醒>"` 让它接着做；或者请用户决定是否改派（见上面的改派）。等待期间该任务记为 `blocked`，写明恢复时间。<br>短暂故障（`server_overloaded`、5xx）：过一会儿再 `nudge`。<br>内容策略（`cyber_policy`）：调整任务措辞后再发给它。<br>每次处理都记入账本 |
