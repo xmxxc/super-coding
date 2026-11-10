@@ -296,6 +296,43 @@ class Checks(unittest.TestCase):
 
         self.assertEqual([r.returncode for r in results], [0, 0], [r.stdout for r in results])
 
+    def checks(self, *commands, ok=True):
+        args = ["checks", "--cwd", str(self.snapshot), "--head", self.head, "--log", str(self.log)]
+        for command in commands:
+            args += ["--cmd", command]
+        return self.env.json(*args, ok=ok)
+
+    def test_a_clean_passing_run_reports_an_unchanged_snapshot(self):
+        result = self.checks("cat a.txt")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["changed"], [])
+        self.assertEqual(git(self.snapshot, "status", "--porcelain"), "")
+
+    def test_a_command_that_edits_a_tracked_file_fails_and_the_edit_is_kept(self):
+        result = self.checks("printf 'changed\\n' > a.txt", ok=False)
+
+        self.assertEqual([r["exit"] for r in result["results"]], [0])
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("a.txt" in c for c in result["changed"]), result["changed"])
+        self.assertEqual((self.snapshot / "a.txt").read_text(), "changed\n")  # not reset
+        self.assertIn("a.txt", self.log.read_text())
+
+    def test_a_command_that_leaves_an_untracked_file_fails(self):
+        result = self.checks("echo out > build.log", ok=False)
+
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("build.log" in c for c in result["changed"]), result["changed"])
+        self.assertTrue((self.snapshot / "build.log").exists())
+
+    def test_a_command_that_moves_head_fails(self):
+        result = self.checks("git -c user.name=t -c user.email=t@t commit -q --allow-empty -m moved", ok=False)
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["head"], self.head)
+        self.assertTrue(any("HEAD" in c for c in result["changed"]), result["changed"])
+        self.assertNotEqual(git(self.snapshot, "rev-parse", "HEAD"), self.head)  # not reset
+
     def test_a_snapshot_with_an_untracked_file_is_not_used(self):
         (self.snapshot / "extra.ts").write_text("export {}\n")
 

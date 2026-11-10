@@ -62,7 +62,7 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
 <ctl> label --repo <owner/name> --issue <N> --from in-review --to changes-requested
 ```
 
-`checks` 在快照有本地改动时会拒绝执行。`candidate` 不会打印密钥的值。`transcribe` 是幂等的：评论正文带隐藏标记 `<!-- ctl:transcribe <标记> -->`，标记由仓库、目标编号、来源报告路径和转录段落确定。发之前先在帖子里找这次转录自己发过的评论：作者是当前 gh 身份（`gh api user`），正文第一行就是标记行，整段正文与这次要发的完全相同（只统一行尾）。找到就直接返回它的 URL 并注明 `"existing": true`。发送报错（例如 GitHub 偶尔返回的 502 或 EOF）后按同样的条件再查一次，评论其实已经发出时同样按成功返回。只是引用了标记的评论（贴出的失败日志、别人复制的标记、改过的正文）不算已发布。所以失败后可以直接重跑，不会产生重复评论，也不会把没发出的转录误报为成功。
+`checks` 在快照有本地改动时会拒绝执行；检查命令执行完后，HEAD、tree 或工作树（含未跟踪文件）有变化的，判为失败，输出的 `changed` 写明哪里变了，现场和日志都保留，不会自动重置。`candidate` 不会打印密钥的值。`transcribe` 是幂等的：评论正文带隐藏标记 `<!-- ctl:transcribe <标记> -->`，标记由仓库、目标编号、来源报告路径和转录段落确定。发之前先在帖子里找这次转录自己发过的评论：作者是当前 gh 身份（`gh api user`），正文第一行就是标记行，整段正文与这次要发的完全相同（只统一行尾）。找到就直接返回它的 URL 并注明 `"existing": true`。发送报错（例如 GitHub 偶尔返回的 502 或 EOF）后按同样的条件再查一次，评论其实已经发出时同样按成功返回。只是引用了标记的评论（贴出的失败日志、别人复制的标记、改过的正文）不算已发布。所以失败后可以直接重跑，不会产生重复评论，也不会把没发出的转录误报为成功。
 
 ### 状态与证据
 
@@ -171,5 +171,9 @@ WFC_STATE=<状态目录> wfc status --active
 2. 找回上次已经取走的消息：
    - Claude Code：读上一次后台 `wait` 的输出；
    - Codex：用 `wfc status --active` 的 `waiters` 和记录的进程号确认旧 relay 的状态，仍在运行但指向旧会话的，停掉它。
+   - OpenCode：用 `wfc status --active` 的 `waiters` 和记录的进程号找到本状态目录里的旧 relay，用 `ps -o args= -p <进程号>` 核对它的 `--opencode-url` 和 `--opencode-session`；指向旧端口或旧会话的，停掉它。
 3. 把账本与 `wfc status --active` 的输出、`relay.log`、`tmux ls` 列出的 `wfc-*` 会话逐一对照。账本里还在进行、却出现在 `reclaimable` 里的 dispatch，说明 worker 已报告 `done`：用 `wfc status --dispatch <id>` 读它的全部消息，看那条 `done` 的 `delivered` 字段，结合账本判断要不要补做处理。已经送达但账本里还没处理的消息，按上面的消息处理表补做。
-4. 重新挂 `wait`，或者在当前会话里用 `wfc relay --codex --detach` 重新启动唯一的一个 relay。
+4. 恢复唤醒：
+   - Claude Code：重新挂 `wait`；
+   - Codex：在当前会话里用 `wfc relay --codex --detach` 重新启动唯一的一个 relay；
+   - OpenCode：按上面 OpenCode 总控的唯一标记流程，确认当前的 URL 和会话 ID，再运行 `wfc relay --opencode-url … --opencode-session … --detach`。然后用 `wfc status --active` 的 `waiters` 确认只有这一个 relay，并核对它投递的第一条消息确实进入了当前会话。全程不要运行 `wait`。

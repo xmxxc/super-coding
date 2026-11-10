@@ -2,7 +2,8 @@
 """The controller's routine checks between rounds, so each round runs them the same way.
 
   checks      move a read-only review snapshot to a head and run the project's checks,
-              logging each command's real exit code
+              logging each command's real exit code; fails when a command changed the head,
+              tree or work tree (tracked or untracked files), and leaves the change in place
   candidate   check a pushed candidate: remote head, tree, no force-push, no committed secret,
               no closing keywords, record comments exist, the worker's port is free
   transcribe  post one section of an offline reviewer's report to the PR, attributed; a rerun
@@ -75,8 +76,29 @@ def run_checks(args, cwd):
             log.write(f"## $ {command}\n{tail}\n## exit={run.returncode}\n")
             log.flush()
             results.append({"cmd": command, "exit": run.returncode})
-    ok = all(r["exit"] == 0 for r in results)
-    return emit({"head": head, "tree": tree, "log": str(Path(args.log).resolve()), "results": results, "ok": ok}, ok)
+        # A command that changed the snapshot means the later checks did not run on the recorded
+        # head and tree. Report what changed and leave it in place: resetting would hide it.
+        changed = snapshot_changes(cwd, head, tree)
+        if changed:
+            log.write("## snapshot changed during checks\n" + "\n".join(changed) + "\n")
+    ok = all(r["exit"] == 0 for r in results) and not changed
+    return emit({"head": head, "tree": tree, "log": str(Path(args.log).resolve()), "results": results,
+                 "changed": changed, "ok": ok}, ok)
+
+
+def snapshot_changes(cwd, head, tree):
+    changed = []
+    now_head = git(cwd, "rev-parse", "HEAD", check=False).stdout.strip()
+    if now_head != head:
+        changed.append(f"HEAD moved from {head} to {now_head or 'unreadable'}")
+    now_tree = git(cwd, "rev-parse", "HEAD^{tree}", check=False).stdout.strip()
+    if now_tree != tree:
+        changed.append(f"HEAD tree changed from {tree} to {now_tree or 'unreadable'}")
+    status = git(cwd, "status", "--porcelain", "--untracked-files=all", check=False)
+    if status.returncode != 0:
+        changed.append(f"git status failed: {status.stderr.strip()}")
+    changed += [f"work tree: {line}" for line in status.stdout.splitlines() if line.strip()]
+    return changed
 
 
 def secret_value(path, key):
