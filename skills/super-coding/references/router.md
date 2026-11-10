@@ -154,7 +154,7 @@ WFC_STATE=<状态目录> wfc status --active
 | `done` | 完成 `returned` 的回读核对。拿消息里的 `head` 和报告里写的 head 比对，再看 `dirty` 是否符合预期（例如由你代提交时，工作树应当有未提交的改动）；对不上就按不一致处理，记进账本。两者为 `null` 表示 router 没读到 git 状态，这时到工作树里自己回读。缺留痕的，按账本补发转录，或者交回 worker 补发 |
 | `question`（由 `ask` 发出） | 在已固定的范围、验收条件和授权内能回答的，直接执行 `wfc reply <消息 id> "<答案>"`。需要用户决定的，把原问题和选项原样转给用户。问题和答案都记入账本 |
 | `stalled` | 先读附带的画面。<br>停在信任或权限提示上：请用户执行 `tmux attach -t wfc-<id>` 处理，该任务记为 `blocked`。同时告诉用户怎么离开：按 Ctrl-b 再按 d；如果终端截获了 Ctrl-b（例如 VS Code 的终端），就在另一个终端执行 `tmux detach-client -s wfc-<id>`，或者让总控代为执行。千万不要按 Ctrl-C，那会直接退出 worker。<br>停下了，但没报告也没提问（例如模型调用遇到网络错误）：回读现场，然后用 `WFC_STATE=<状态目录> wfc nudge <dispatch> --text "<提醒>"` 打一行提醒，并把这次介入记入账本。提醒之后再次报 `stalled` 的，记为 `blocked` |
-| `blocked` | worker 的本轮因宿主报错而结束。消息附带宿主的错误类型 `kind` 和原文 `message`。先读原文，再按类型处理：<br>额度耗尽（`usage_limit_exceeded`、`rate_limit`）或认证失败（401、`token expired` 之类）：角色表里该角色配了备用的，按上面的改派换到备用宿主和模型，旧 dispatch 记为 `stale`；没配备用的，该任务记为 `blocked`，请用户处理：额度耗尽的，由用户决定是等到原文里的恢复时间再 `nudge` 一次，还是另换宿主；认证失败的，请用户重新登录 worker 用的命令行，登录后再 `nudge` 一次。不要对同一个宿主反复 `nudge`，也不要新开会话硬试。总控和 worker 可能用不同的认证（例如总控是 VS Code 扩展，worker 是经本地网关的命令行），总控能正常对话，不代表 worker 能用。<br>短暂故障（`server_overloaded`、5xx）：过一会儿再 `nudge`。<br>内容策略（`cyber_policy`）：调整任务措辞后再发给它。<br>每次处理都记入账本 |
+| `blocked` | worker 的本轮因宿主报错而结束。消息附带宿主的错误类型 `kind` 和原文 `message`。先读原文，再按类型处理：<br>额度耗尽（`usage_limit_exceeded`、`rate_limit`）或认证失败（401、`token expired` 之类）：角色表里该角色配了备用、备用宿主不是当前失败的这个、而且这一轮还没有因为账号问题试过它时，按上面的改派换到备用宿主和模型，旧 dispatch 记为 `stale`，并把已经试过的宿主记进账本；没配备用的，或者备用也已失败的，该任务记为 `blocked`，请用户修复认证或者处理额度，问题解决前不要再为同一个宿主新开会话：额度耗尽的，由用户决定是等到原文里的恢复时间再 `nudge` 一次，还是另换宿主；认证失败的，请用户重新登录 worker 用的命令行，登录后再 `nudge` 一次。不要对同一个宿主反复 `nudge`，也不要新开会话硬试。总控和 worker 可能用不同的认证（例如总控是 VS Code 扩展，worker 是经本地网关的命令行），总控能正常对话，不代表 worker 能用。<br>短暂故障（`server_overloaded`、5xx）：过一会儿再 `nudge`。<br>内容策略（`cyber_policy`）：调整任务措辞后再发给它。<br>每次处理都记入账本 |
 | `exited` | 先检查 worker 退出前是否已经提交或推送，再用 `resume <dispatch>` 让它回到原会话，接着做当前任务，并记入账本。`resume` 找不到会话或者再次 `exited` 时，按账本的失效规则处理：记为 `stale`，保留现场，用下一轮编号新派，在新任务文件里写明真实起点，以及旧现场是续用还是放弃 |
 
 每条消息都带 dispatch id，对照账本找到它所属的票和任务。记为 `blocked` 的任务，在 `state.md` 写清楚在等谁、要做什么、结果交回哪里。
@@ -171,5 +171,5 @@ WFC_STATE=<状态目录> wfc status --active
 2. 找回上次已经取走的消息：
    - Claude Code：读上一次后台 `wait` 的输出；
    - Codex：用 `wfc status --active` 的 `waiters` 和记录的进程号确认旧 relay 的状态，仍在运行但指向旧会话的，停掉它。
-3. 把账本与 `wfc status --active` 的输出、`relay.log`、`tmux ls` 列出的 `wfc-*` 会话逐一对照。账本里还在进行、却出现在 `reclaimable` 里的 dispatch，说明它的 `done` 已经送达，用 `wfc status --dispatch <id>` 读它的全部消息。已经送达但账本里还没处理的消息，按上面的消息处理表补做。
+3. 把账本与 `wfc status --active` 的输出、`relay.log`、`tmux ls` 列出的 `wfc-*` 会话逐一对照。账本里还在进行、却出现在 `reclaimable` 里的 dispatch，说明 worker 已报告 `done`：用 `wfc status --dispatch <id>` 读它的全部消息，看那条 `done` 的 `delivered` 字段，结合账本判断要不要补做处理。已经送达但账本里还没处理的消息，按上面的消息处理表补做。
 4. 重新挂 `wait`，或者在当前会话里用 `wfc relay --codex --detach` 重新启动唯一的一个 relay。
