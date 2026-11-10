@@ -12,6 +12,8 @@ disable-model-invocation: true
 
 ## 你在哪个宿主
 
+你的宿主就是你自己运行的这个。例如在 Codex 里，你执行的命令能读到有值的 `CODEX_THREAD_ID`。机器上其他总控进程和 relay 属于别的范围，不能拿来推断自己是谁。接管时，用 `wfc status` 输出里的 `waiters` 确认本状态目录有没有旧的 `wait` 或 relay。
+
 - **Claude Code**：每次派发或回复之后，后台挂一个 `wfc wait`，然后结束当前回复。
 - **Codex**：在总控会话里启动一次 `wfc relay --codex --detach`，消息会作为新的一轮送到你这里。总控会话用 `danger-full-access` 启动。
 - **OpenCode**：总控会话要用固定端口启动（`opencode <目录> --port <端口>`）。接管后启动一次 `wfc relay --opencode-url … --opencode-session … --detach`，消息会作为新的一轮送到你这里。
@@ -20,7 +22,10 @@ disable-model-invocation: true
 
 ## 派给谁
 
-实施者和审查者的宿主与模型由用户在调用时指定，记入账本。用户没有指定时，先问用户，再派发。
+接管时先读项目的角色表 `docs/agents/roles.md`，按任务的角色（实施、前端实施、审查等）取宿主、模型、推理强度、是否联网，以及备用宿主和模型。格式和示例见 [角色表模板](references/roles.md)。
+
+- 表不存在时，先问用户，再按模板把用户的回答写进这张表，以后接管直接用。
+- 用户在对话里临时另行指定的，以对话为准，并记入账本。
 
 ## 审查节奏
 
