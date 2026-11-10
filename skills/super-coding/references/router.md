@@ -107,7 +107,7 @@ WFC_STATE=<状态目录> wfc resume <dispatch> [--task <下一轮任务文件> -
 ## 会话的生命周期
 
 - 每个 worker 和审查者的 tmux 会话，都保留到整个范围放行或关闭为止。worker 报告 `done` 之后也不要关掉它，后面的修复和复核还要用 `continue` 续派。
-- 范围结束后，把 tmux 会话、worktree、router 状态目录和端口占用都列进回收清单，由用户决定什么时候回收。总控不要自己去关会话、停服务。
+- 范围结束后，把 tmux 会话、worktree、router 状态目录和端口占用都列进回收清单，由用户决定什么时候回收。已经 `done` 但 tmux 会话还在的 dispatch，可以参考 `wfc status --active` 的 `reclaimable`（`dispatch`、`label`、`tmux`）。总控不要自己去关会话、停服务。
 - 每张票分配不同的端口，并写进任务文件。router 的 brief 会要求 worker 在报告完工前停掉自己启动的服务。
 
 ## 等待与唤醒
@@ -118,7 +118,7 @@ WFC_STATE=<状态目录> wfc resume <dispatch> [--task <下一轮任务文件> -
 WFC_STATE=<状态目录> wfc wait --timeout <秒> [--stall-after <秒>]
 ```
 
-然后结束当前回复。同一时刻只保留一个 `wait`。用户在窗口里发言也会唤醒你；回应完用户后，确认后台的 `wait` 还在。`wait` 以退出码 3 返回，表示超时：先用 `wfc status` 查看，再回读各任务的现场，有进展就重新挂 `wait`，没有进展的任务记为 `blocked`。
+然后结束当前回复。同一时刻只保留一个 `wait`。用户在窗口里发言也会唤醒你；回应完用户后，确认后台的 `wait` 还在。`wait` 以退出码 3 返回，表示超时：先用 `wfc status --active` 查看，再回读各任务的现场，有进展就重新挂 `wait`，没有进展的任务记为 `blocked`。
 
 **Codex 总控**：总控会话用 `danger-full-access` 启动。接管后执行一次
 
@@ -126,7 +126,7 @@ WFC_STATE=<状态目录> wfc wait --timeout <秒> [--stall-after <秒>]
 WFC_STATE=<状态目录> wfc relay --codex --detach [--stall-after <秒>]
 ```
 
-`--codex` 从 Codex 为命令设置的 `CODEX_THREAD_ID` 取本会话的线程，并在启动前核对对应的 rollout，所以必须在总控会话自己的命令里运行。它会输出进程号和日志路径，把它们写进 `state.md`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。relay 启动后，要确认它投递的第一条消息确实到了你这里。relay 报 `no rollout found` 并退出（启动时拒绝，或投递时 `codex queue` 找不到会话）时，说明线程不对：回头检查是不是在总控会话里运行的，不要换个 ID 硬试。如果派发后迟迟没有动静，先用 `wfc status` 和 `relay.log` 看消息是否已经标为送达。
+`--codex` 从 Codex 为命令设置的 `CODEX_THREAD_ID` 取本会话的线程，并在启动前核对对应的 rollout，所以必须在总控会话自己的命令里运行。它会输出进程号和日志路径，把它们写进 `state.md`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。relay 启动后，要确认它投递的第一条消息确实到了你这里。relay 报 `no rollout found` 并退出（启动时拒绝，或投递时 `codex queue` 找不到会话）时，说明线程不对：回头检查是不是在总控会话里运行的，不要换个 ID 硬试。如果派发后迟迟没有动静，先用 `wfc status --active` 和 `relay.log` 看消息是否已经标为送达。
 
 **OpenCode 总控**：总控会话必须用固定端口启动，例如 `opencode <工作目录> --port 4096`（默认端口是随机的，relay 找不到）。接管后执行一次
 
@@ -142,10 +142,10 @@ WFC_STATE=<状态目录> wfc relay --opencode-url http://127.0.0.1:<端口> --op
 **查看状态**：`wait` 超时，或者怀疑丢了消息时，先运行
 
 ```sh
-WFC_STATE=<状态目录> wfc status [--dispatch <id>]
+WFC_STATE=<状态目录> wfc status --active
 ```
 
-它只读不取消息，列出每个 dispatch 的状态（`working`、`asking`、`done`、`exited`）、最后一条消息、画面静止的秒数，以及还没送达的消息和正在运行的 `wait` 或 relay；带 `--dispatch` 时附上这个 dispatch 的全部消息。不要直接查 `router.db`。
+它只读不取消息，只列出还没完成的 dispatch（`working`、`asking`、`exited`）及其最后一条消息、画面静止的秒数，照常列出还没送达的消息（`undelivered`）和正在运行的 `wait` 或 relay（`waiters`）；已经 `done`、tmux 会话还在的 dispatch 列在 `reclaimable` 里。要看某个 dispatch 的全部消息，改用 `wfc status --dispatch <id>`（不能和 `--active` 一起用）。不带参数的 `wfc status` 列出全部 dispatch。不要直接查 `router.db`。
 
 ## 消息处理
 
@@ -170,6 +170,6 @@ WFC_STATE=<状态目录> wfc status [--dispatch <id>]
 1. 按[账本](../../ai-coding/references/ledger.md)回读 `state.md`，并读角色表 `docs/agents/roles.md`。
 2. 找回上次已经取走的消息：
    - Claude Code：读上一次后台 `wait` 的输出；
-   - Codex：用 `wfc status` 的 `waiters` 和记录的进程号确认旧 relay 的状态，仍在运行但指向旧会话的，停掉它。
-3. 把账本与 `wfc status` 的输出（需要某个 dispatch 的全部消息时加 `--dispatch <id>`）、`relay.log`、`tmux ls` 列出的 `wfc-*` 会话逐一对照。已经送达但账本里还没处理的消息，按上面的消息处理表补做。
+   - Codex：用 `wfc status --active` 的 `waiters` 和记录的进程号确认旧 relay 的状态，仍在运行但指向旧会话的，停掉它。
+3. 把账本与 `wfc status --active` 的输出、`relay.log`、`tmux ls` 列出的 `wfc-*` 会话逐一对照。账本里还在进行、却出现在 `reclaimable` 里的 dispatch，说明它的 `done` 已经送达，用 `wfc status --dispatch <id>` 读它的全部消息。已经送达但账本里还没处理的消息，按上面的消息处理表补做。
 4. 重新挂 `wait`，或者在当前会话里用 `wfc relay --codex --detach` 重新启动唯一的一个 relay。

@@ -12,13 +12,13 @@ disable-model-invocation: true
 
 ## 你在哪个宿主
 
-你的宿主就是你自己运行的这个。例如在 Codex 里，你执行的命令能读到有值的 `CODEX_THREAD_ID`。机器上其他总控进程和 relay 属于别的范围，不能拿来推断自己是谁。接管时，用 `wfc status` 输出里的 `waiters` 确认本状态目录有没有旧的 `wait` 或 relay。
+你的宿主就是你自己运行的这个。例如在 Codex 里，你执行的命令能读到有值的 `CODEX_THREAD_ID`。机器上其他总控进程和 relay 属于别的范围，不能拿来推断自己是谁。接管时，用 `wfc status --active` 输出里的 `waiters` 确认本状态目录有没有旧的 `wait` 或 relay。
 
 - **Claude Code**：每次派发或回复之后，后台挂一个 `wfc wait`，然后结束当前回复。
 - **Codex**：在总控会话里启动一次 `wfc relay --codex --detach`，消息会作为新的一轮送到你这里。总控会话用 `danger-full-access` 启动。
 - **OpenCode**：总控会话要用固定端口启动（`opencode <目录> --port <端口>`）。接管后启动一次 `wfc relay --opencode-url … --opencode-session … --detach`，消息会作为新的一轮送到你这里。
 
-需要 `wfc` 0.4.1 及以上版本。各宿主的具体命令和恢复步骤，都在 [router 派发](references/router.md)。
+需要 `wfc` 0.4.2 及以上版本。各宿主的具体命令和恢复步骤，都在 [router 派发](references/router.md)。
 
 ## 派给谁
 
@@ -42,4 +42,4 @@ disable-model-invocation: true
 与 ai-coding 相同，另外加两条：
 
 - 每个 dispatch 的最终状态都记入账本：`returned`、`stale` 或 `blocked`，并写明原因。
-- 范围完成时，停掉 relay，列出 tmux 会话、worktree、router 状态目录和端口占用，作为回收清单交给用户。在此之前，worker 的会话一律保留。
+- 范围完成时，停掉 relay，列出 tmux 会话、worktree、router 状态目录和端口占用，作为回收清单交给用户；已经 `done` 但 tmux 会话还在的 dispatch，可以参考 `wfc status --active` 的 `reclaimable`。回收是否执行由用户决定。在此之前，worker 的会话一律保留。
