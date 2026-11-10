@@ -18,7 +18,7 @@ Then start a controller session and invoke `super-coding` with the repository an
 
 - `skills/super-coding/`: the controller skill. `references/router.md` covers dispatch, waiting, continue/resume, message handling and recovery.
 - `skills/super-coding/scripts/ctl.py`: the controller's routine checks between rounds (snapshot checks with real exit codes, candidate read-back, transcribing an offline reviewer's record, lifecycle label switch). Python standard library; uses git and gh. The skill runs it from its own directory, so installing the skill installs the script.
-- `skills/ai-coding/`, `skills/live-verify/`: pinned copies of the prototypes; see [skills/VENDORED.md](skills/VENDORED.md).
+- `skills/ai-coding/`: a pinned copy of the prototype. `skills/live-verify/`: forked from the skills repository and maintained here. See [skills/VENDORED.md](skills/VENDORED.md).
 - `install.py`: the installer. `tests/`: `test_ctl.py` (real git, fake gh) and `test_install.py` (throwaway HOME).
 
 ## Development

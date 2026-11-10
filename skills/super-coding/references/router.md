@@ -109,7 +109,7 @@ WFC_STATE=<状态目录> wfc resume <dispatch> [--task <下一轮任务文件> -
 ## 会话的生命周期
 
 - 每个 worker 和审查者的 tmux 会话，都保留到整个范围放行或关闭为止。worker 报告 `done` 之后也不要关掉它，后面的修复和复核还要用 `continue` 续派。
-- 范围结束后，把 tmux 会话、worktree、router 状态目录和端口占用都列进回收清单，由用户决定什么时候回收。已经 `done` 但 tmux 会话还在的 dispatch，可以参考 `wfc status --active` 的 `reclaimable`（`dispatch`、`label`、`tmux`）。总控不要自己去关会话、停服务。
+- 范围结束后，把 tmux 会话、worktree、已合并 PR 的实施分支（本地和远端）、router 状态目录和端口占用都列进回收清单，由用户决定什么时候回收。分支只列已合并、并且核实过当前 head 就是 PR 合并时的 head 的。已经 `done` 但 tmux 会话还在的 dispatch，可以参考 `wfc status --active` 的 `reclaimable`（`dispatch`、`label`、`tmux`），用户同意后再关闭对应的 `wfc-<id>` 会话。用户没有同意之前，总控不要自己去关会话、删分支、停服务。
 - 每张票分配不同的端口，并写进任务文件。router 的 brief 会要求 worker 在报告完工前停掉自己启动的服务。
 
 ## 等待与唤醒

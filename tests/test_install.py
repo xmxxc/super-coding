@@ -38,6 +38,17 @@ class Install(unittest.TestCase):
         self.assertEqual((claude / "ai-coding" / "SKILL.md").read_text(), "the user's own ai-coding\n")
         self.assertTrue((codex / "ai-coding" / "SKILL.md").is_file())
 
+    def test_the_users_own_live_verify_is_never_overwritten(self):
+        skills = self.home / ".claude" / "skills"
+        (skills / "live-verify").mkdir(parents=True)
+        (skills / "live-verify" / "SKILL.md").write_text("the user's own live-verify\n")
+
+        result = self.run_install()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((skills / "live-verify" / "SKILL.md").read_text(), "the user's own live-verify\n")
+        self.assertFalse((skills / "live-verify" / "references").exists())
+
     def test_a_second_install_replaces_the_workflow_skill(self):
         skills = self.home / ".claude" / "skills"
         skills.mkdir(parents=True)

@@ -42,4 +42,4 @@ disable-model-invocation: true
 与 ai-coding 相同，另外加两条：
 
 - 每个 dispatch 的最终状态都记入账本：`returned`、`stale` 或 `blocked`，并写明原因。
-- 范围完成时，停掉 relay，列出 tmux 会话、worktree、router 状态目录和端口占用，作为回收清单交给用户；已经 `done` 但 tmux 会话还在的 dispatch，可以参考 `wfc status --active` 的 `reclaimable`。回收是否执行由用户决定。在此之前，worker 的会话一律保留。
+- 范围完成时，停掉 relay，列出 tmux 会话、worktree、已合并 PR 的实施分支（本地和远端）、router 状态目录和端口占用，作为回收清单交给用户；已经 `done` 但 tmux 会话还在的 dispatch，可以参考 `wfc status --active` 的 `reclaimable`，用户同意后再关闭对应的 `wfc-<id>` 会话。回收是否执行由用户决定。在此之前，worker 的会话一律保留。
