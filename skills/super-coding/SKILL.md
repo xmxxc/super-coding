@@ -43,5 +43,5 @@ disable-model-invocation: true
 
 与 ai-coding 相同，另外加两条：
 
-- 每个 dispatch 的最终状态都记入账本：`returned`、`stale` 或 `blocked`，并写明原因。已记为 `stale` 的会话再发来通知时，记一笔，并在回收清单里提议用 `wfc reclaim --dispatch <id>` 回收，用户同意后再加 `--yes` 执行，不要只记"已忽略"。
+- 每个 dispatch 的最终状态都记入账本：`returned`、`stale` 或 `blocked`，并写明原因。已记为 `stale` 的会话再发来通知时，记一笔，再看账本里它的回收决定：还没提议过的，在回收清单里提议一次用 `wfc reclaim --dispatch <id>` 回收，用户同意后再加 `--yes` 执行；已提议待答复，或用户已拒绝、延期的，只记一笔不再提议，直到用户重新提起或出现新的回收资产。用户的决定按 dispatch 记进账本。处理完照常对账推进，不要只记"已忽略"。
 - 范围完成时，停掉 relay，列出 tmux 会话、worktree、已合并 PR 的实施分支（本地和远端）、router 状态目录和端口占用，作为回收清单交给用户；会话用 `wfc reclaim` 列出、用户同意后再加 `--yes` 关闭，做法见 [router 派发](references/router.md) 的“会话的生命周期”。回收是否执行由用户决定。在此之前，worker 的会话一律保留。
