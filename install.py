@@ -4,9 +4,10 @@
   python3 install.py
 
 Installs `super-coding` (replacing an earlier installed copy) into ~/.claude/skills and
-~/.codex/skills, for each of the two that exists. The skills it builds on, `ai-coding`,
-`live-verify` and `setup-matt-pocock-skills`, are installed only where the user has none of their
-own. A linked development install (a symlink) is left alone. The dispatcher, `wfc`, comes from
+~/.codex/skills, for each of the two that exists. The bundled `live-verify` and
+`setup-matt-pocock-skills` are installed only where the user has none of their own. A linked
+development install (a symlink) is left alone. An `ai-coding` from an earlier release is kept, with a
+note that super-coding no longer depends on it. The dispatcher, `wfc`, comes from
 xmxxc/workflow-core.
 """
 
@@ -16,7 +17,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 WORKFLOW_SKILL = "super-coding"
-PROTOTYPES = ("ai-coding", "live-verify", "setup-matt-pocock-skills")
+BUNDLED = ("live-verify", "setup-matt-pocock-skills")
+RETIRED = "ai-coding"  # merged into super-coding in 0.5.0
 
 
 def install_skill(name, target, replace):
@@ -56,8 +58,10 @@ def main(argv):
     for target in found:
         target.mkdir(exist_ok=True)
         print(install_skill(WORKFLOW_SKILL, target, replace=True))
-        for name in PROTOTYPES:
+        for name in BUNDLED:
             print(install_skill(name, target, replace=False))
+        if (target / RETIRED).exists():
+            print(f"{target / RETIRED}: super-coding no longer depends on it; you can remove it yourself")
     if not shutil.which("wfc"):
         print("note: `wfc` is not on PATH; download it from the xmxxc/workflow-core Releases")
     return 0

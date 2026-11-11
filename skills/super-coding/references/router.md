@@ -1,6 +1,6 @@
 # router 派发
 
-用 `wfc` 命令把 worker 和审查者派到各自宿主的 tmux 会话里，然后你去睡眠，等它们发来消息再醒。账本、交接、审查、验证和放行的规则见 [ai-coding 的 references](../../ai-coding/references/)。
+用 `wfc` 命令把 worker 和审查者派到各自宿主的 tmux 会话里，然后你去睡眠，等它们发来消息再醒。账本、交接、审查、验证和放行的规则在本目录的其他文件里，按 [SKILL.md](../SKILL.md#按场景读取) 的场景读取。
 
 ## 前提
 
@@ -32,6 +32,7 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
 - **本地提交（`--git`）**：Codex 的沙箱默认不能在链接 worktree 里提交。Codex 实施者需要自己做本地提交时才带 `--git`，例如有多次提交的票。开启后，worker 能改主仓库 `.git` 下的所有内容，不只是自己的分支。Codex worker 没有凭据，沙箱默认也不联网，所以推送、开 PR 和发评论由你代做；带 `--git` 也只是允许本地提交。不带 `--git` 时，Codex 实施者的提交也由你代做。Claude Code 和 OpenCode 本来就能写 `.git`，会忽略这个参数。
 - 需要推送分支、建 PR 或发评论的任务，派给能联网的宿主；或者在你的授权范围内由你代发。
 - worker 完工用 `done` 报告，需要决定时用 `ask` 提问。这两条命令的用法由 router 写进 worker 的说明。
+- `dispatch` 或 `continue` 超时、报错时，先用 `wfc status --active` 查询是否已经创建或送出，避免重复派发。
 
 ### 断网的审查者（Codex）
 
@@ -66,13 +67,7 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
 
 ### 状态与证据
 
-| 状态 | router 证据 |
-| --- | --- |
-| `pending-handoff` | `dispatch` 或 `continue` 已经成功返回 |
-| `accepted` | 收到该 dispatch 的消息，或者 `tmux capture-pane -p -t wfc-<id>` 显示它已经开始处理本轮任务 |
-| `returned` | 收到本轮的 `done`，并且按 [账本](../../ai-coding/references/ledger.md) 完成了回读核对，包括 `done` 消息里的 `head` 和 `dirty` |
-
-**独立性**：实施和审查分别派发。dispatch id 不同，就是不同的宿主会话、各自的上下文。各个 worker 能读到同一个状态库，OpenCode 还能写任意路径，所以文件隔离不能作为独立性的证据。审查者的 `--cwd` 用固定快照或独立的工作树。
+各任务状态（`pending-handoff`、`accepted`、`returned` 等）对应的 router 证据见 [账本的任务状态](ledger.md#任务状态)；独立性的证据见 [独立审查](review.md#独立性)。
 
 ## 续派：修复与增量复核
 
@@ -150,7 +145,7 @@ WFC_STATE=<状态目录> wfc relay --opencode-url http://127.0.0.1:<端口> --op
 
 ### 唤醒后对账
 
-每次被唤醒（worker 的消息、`wait` 返回、relay 投递、用户发言），按下面的消息处理表处理完消息之后，都按 [ai-coding 的"每轮先对账"](../../ai-coding/SKILL.md) 对账一次，再决定这一轮怎么结束。对账看三件事：
+每次被唤醒（worker 的消息、`wait` 返回、relay 投递、用户发言），按下面的消息处理表处理完消息之后，都按 [每轮先对账](../SKILL.md#每轮先对账) 对账一次，再决定这一轮怎么结束。对账看三件事：
 
 1. **就绪的票**：账本里依赖已满足、还没有派发的票，以及审查、修复、复核里可以进入下一步的票。
 2. **空位**：按角色表和账本，实施和审查还能再开几个会话；正在 `working`、`asking` 的 dispatch 占着位置，`blocked` 的只占它自己那张票。
@@ -203,7 +198,7 @@ WFC_STATE=<状态目录> wfc status --active
 - **已经提议、用户还没答复**：只记一笔，不再提议。
 - **用户已经拒绝或延期**：沿用用户的决定，只记一笔，不再提议。只有用户主动重新提起，或者出现了新的回收资产需要确认时，才再问。
 
-用户的答复（同意、拒绝或延期）按 dispatch 记进账本，与[回收清单里"不同意的保留并记录"](../../live-verify/references/work-records.md)一致。不要每次只写"已忽略"就结束这一轮，处理完照常按[唤醒后对账](#唤醒后对账)继续推进。
+用户的答复（同意、拒绝或延期）按 dispatch 记进账本；不同意回收的保留，并记下保留了什么、为什么。不要每次只写"已忽略"就结束这一轮，处理完照常按[唤醒后对账](#唤醒后对账)继续推进。
 
 记为 `blocked` 的任务，在 `state.md` 写清楚在等谁、要做什么、结果交回哪里。
 
@@ -215,7 +210,7 @@ WFC_STATE=<状态目录> wfc status --active
 
 `wait` 和 relay 都是先把消息标为"已送达"，再交给你。所以换会话、上下文压缩或意外中断之后：
 
-1. 按[账本](../../ai-coding/references/ledger.md)回读 `state.md`，并读角色表 `docs/agents/roles.md`。
+1. 按[账本](ledger.md#意外恢复)回读 `state.md`，并读角色表 `docs/agents/roles.md`。
 2. 找回上次已经取走的消息：
    - Claude Code：读上一次后台 `wait` 的输出；
    - Codex：用 `wfc status --active` 的 `waiters` 和记录的进程号确认旧 relay 的状态，仍在运行但指向旧会话的，停掉它。

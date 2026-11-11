@@ -38,7 +38,7 @@ flowchart TD
     L --> X["Cleanup<br/>after the user confirms"]
 ```
 
-Review semantics (full, incremental and final), independence rules and record formats follow `ai-coding`'s [review reference](skills/ai-coding/references/review.md).
+Review semantics (full, incremental and final), independence rules and record formats are in [references/review.md](skills/super-coding/references/review.md).
 
 ## Features
 
@@ -47,6 +47,7 @@ Review semantics (full, incremental and final), independence rules and record fo
 - **Same-session fixes.** `wfc continue` sends fixes to the original implementer and re-reviews to the original reviewer; the review widens to a full one when the patch's impact is unclear or history was rewritten.
 - **Reconcile on every wake.** After handling a message the controller dispatches whatever is ready and only stops when the remaining items need the user (merge, live acceptance, production, reclaim).
 - **Routine checks as a script.** `scripts/ctl.py` runs snapshot checks with real exit codes, reads back the candidate, transcribes an offline reviewer's record, and switches lifecycle labels.
+- **Ledger, review and release rules in one skill.** The ledger, task files, independent review, verification levels, issue labels and the release handoff are references of `super-coding`, each read at the stage that needs it.
 - **Role table.** Hosts, models, reasoning effort, network access and fallbacks per role live in `docs/agents/roles.md`.
 - **User-controlled cleanup.** When the scope is done, tmux sessions, worktrees, merged branches, router state and ports are listed for the user; sessions are closed with `wfc reclaim` only after the user agrees.
 
@@ -67,7 +68,7 @@ At run time these skills call, or rely on, skills from the public [mattpocock/sk
 
 | Skill | Status | How it is used |
 | --- | --- | --- |
-| [`setup-matt-pocock-skills`](https://github.com/mattpocock/skills/tree/main/skills/engineering/setup-matt-pocock-skills) | **Bundled.** A pinned, unmodified copy ships in `skills/setup-matt-pocock-skills/`; `install.py` installs it only where you have none of your own. | Called by `ai-coding` (and so by `super-coding`) and by `live-verify` when the project is not initialized, that is, when `docs/agents/` lacks the issue tracker, label or domain configuration. Run it once per project first. |
+| [`setup-matt-pocock-skills`](https://github.com/mattpocock/skills/tree/main/skills/engineering/setup-matt-pocock-skills) | **Bundled.** A pinned, unmodified copy ships in `skills/setup-matt-pocock-skills/`; `install.py` installs it only where you have none of your own. | Called by `super-coding` and `live-verify` when the project is not initialized, that is, when `docs/agents/` lacks the issue tracker, label or domain configuration. Run it once per project first. |
 | [`code-review`](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review), [`implement`](https://github.com/mattpocock/skills/tree/main/skills/engineering/implement), [`tdd`](https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd) | **Recommended, not bundled.** Install separately. | General development skills the workers use. The task files leave the working method to the development workflow installed in the project rather than naming these skills, so install the ones your workers should use. |
 
 ## Quick start
@@ -78,7 +79,7 @@ At run time these skills call, or rely on, skills from the public [mattpocock/sk
    python3 install.py
    ```
 
-   It installs `super-coding` into `~/.claude/skills` and `~/.codex/skills` (for each of the two that exists), and installs `ai-coding`, `live-verify` and the bundled `setup-matt-pocock-skills` only where you have none of your own. A linked development install is left alone. Put `wfc` on your `PATH` as well.
+   It installs `super-coding` into `~/.claude/skills` and `~/.codex/skills` (for each of the two that exists), and installs the bundled `live-verify` and `setup-matt-pocock-skills` only where you have none of your own. A linked development install is left alone. A skill left over from an earlier release that `super-coding` no longer needs is kept, and the installer says you can remove it. Put `wfc` on your `PATH` as well.
 
 2. **Initialize the project.** If `docs/agents/` does not yet describe the issue tracker, labels and domain, run `setup-matt-pocock-skills` (installed in step 1) in the project.
 
@@ -116,10 +117,15 @@ The template in the repository is in Chinese; the example above is a translation
 │   │   ├── SKILL.md
 │   │   ├── references/
 │   │   │   ├── router.md         # dispatch, waiting, continue/resume, messages, recovery
-│   │   │   └── roles.md          # role table template
+│   │   │   ├── roles.md          # role table template
+│   │   │   ├── ledger.md         # ledger, task states, records
+│   │   │   ├── handoff.md        # implementation and fix task files
+│   │   │   ├── review.md         # independent review
+│   │   │   ├── verification.md   # verification levels and matrices
+│   │   │   ├── labels.md         # issue labels
+│   │   │   └── release.md        # release handoff and closeout
 │   │   └── scripts/ctl.py        # routine checks between rounds
-│   ├── ai-coding/                # pinned copy of the prototype
-│   ├── live-verify/              # forked from the skills repository, maintained here
+│   ├── live-verify/              # merge and live acceptance, maintained here
 │   ├── setup-matt-pocock-skills/ # pinned third-party copy from mattpocock/skills
 │   └── VENDORED.md
 └── tests/
@@ -127,9 +133,9 @@ The template in the repository is in Chinese; the example above is a translation
     └── test_install.py           # throwaway HOME
 ```
 
-- `skills/super-coding/references/router.md` covers dispatch, waiting, continue/resume, message handling and recovery.
+- `skills/super-coding/references/router.md` covers dispatch, waiting, continue/resume, message handling and recovery; the other references hold the ledger, handoff, review, verification, label and release rules.
 - `skills/super-coding/scripts/ctl.py` is the controller's routine checks between rounds (snapshot checks with real exit codes, candidate read-back, transcribing an offline reviewer's record, lifecycle label switch). It uses only the Python standard library, plus git and gh. The skill runs it from its own directory, so installing the skill installs the script.
-- `skills/ai-coding/` is a pinned copy of the prototype; `skills/live-verify/` was forked from the skills repository and is maintained here; `skills/setup-matt-pocock-skills/` is a pinned, unmodified copy from mattpocock/skills. See [skills/VENDORED.md](skills/VENDORED.md).
+- `skills/live-verify/` was forked from the skills repository and is maintained here; `skills/setup-matt-pocock-skills/` is a pinned, unmodified copy from mattpocock/skills. See [skills/VENDORED.md](skills/VENDORED.md).
 
 ## Relationship to workflow-core
 
@@ -151,6 +157,6 @@ To release, push a tag `v<version>`. The release workflow runs the tests, packs 
 
 ## License
 
-[MIT](LICENSE) © xmxxc, for `super-coding`, `ai-coding`, `live-verify` and the rest of this repository.
+[MIT](LICENSE) © xmxxc, for `super-coding`, `live-verify` and the rest of this repository.
 
 The bundled `skills/setup-matt-pocock-skills/` comes from [mattpocock/skills](https://github.com/mattpocock/skills) and is licensed under MIT, Copyright (c) 2026 Matt Pocock. Its license file ships beside it; the source commit, checksums and full notice are in [skills/VENDORED.md](skills/VENDORED.md). The recommended skills listed under [Prerequisites](#skills-from-mattpocockskills) are not included and keep their own license.

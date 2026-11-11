@@ -38,7 +38,7 @@ flowchart TD
     L --> X["清理<br/>用户确认后执行"]
 ```
 
-三种审查（完整审查、增量复核、最终完整审查）的定义、独立性要求和记录格式，以 `ai-coding` 的[独立审查](skills/ai-coding/references/review.md)为准。
+三种审查（完整审查、增量复核、最终完整审查）的定义、独立性要求和记录格式，见 [references/review.md](skills/super-coding/references/review.md)。
 
 ## 特性
 
@@ -47,6 +47,7 @@ flowchart TD
 - **原会话修复**：用 `wfc continue` 把修复交给原实施者、把复核交给原审查者；补丁影响不清，或者改写过历史时，扩大为完整审查。
 - **每次唤醒都对账**：处理完消息，总控会把就绪的工作派出去，只有剩下的都是需要用户授权的事（合并、真机验收、生产操作、回收）时才停下。
 - **例行检查脚本化**：`scripts/ctl.py` 负责快照检查（记录真实退出码）、回读候选、转录断网审查者的记录、切换生命周期标签。
+- **账本、审查与放行规则都在一个技能里**：账本、任务文件、独立审查、验证分层、Issue 标签和放行交接都是 `super-coding` 的 references，到了对应阶段再读。
 - **角色表**：各角色用哪个宿主、模型、推理强度、能否联网、备用方案，都写在 `docs/agents/roles.md`。
 - **清理由用户决定**：范围完成后，总控把 tmux 会话、worktree、已合并的分支、router 状态目录和端口占用列给用户；用户同意后才用 `wfc reclaim` 关闭会话。
 
@@ -67,7 +68,7 @@ flowchart TD
 
 | 技能 | 状态 | 用途 |
 | --- | --- | --- |
-| [`setup-matt-pocock-skills`](https://github.com/mattpocock/skills/tree/main/skills/engineering/setup-matt-pocock-skills) | **已随包附带**：`skills/setup-matt-pocock-skills/` 是一份未经修改的锁定副本，`install.py` 只在你自己没有同名技能时安装它。 | 项目没有初始化（`docs/agents/` 里缺 tracker、标签或领域配置）时，`ai-coding`（因而也包括 `super-coding`）和 `live-verify` 会先调用它。每个项目先跑一次。 |
+| [`setup-matt-pocock-skills`](https://github.com/mattpocock/skills/tree/main/skills/engineering/setup-matt-pocock-skills) | **已随包附带**：`skills/setup-matt-pocock-skills/` 是一份未经修改的锁定副本，`install.py` 只在你自己没有同名技能时安装它。 | 项目没有初始化（`docs/agents/` 里缺 tracker、标签或领域配置）时，`super-coding` 和 `live-verify` 会先调用它。每个项目先跑一次。 |
 | [`code-review`](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review)、[`implement`](https://github.com/mattpocock/skills/tree/main/skills/engineering/implement)、[`tdd`](https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd) | **推荐，不随包附带**，需要另外安装。 | worker 用到的通用开发技能。任务文件不点名这些技能，而是让执行者按项目已安装的开发工作流选择方法，所以请装好你希望 worker 使用的技能。 |
 
 ## 快速开始
@@ -78,7 +79,7 @@ flowchart TD
    python3 install.py
    ```
 
-   它会把 `super-coding` 装进 `~/.claude/skills` 和 `~/.codex/skills`（两者中存在的那个或两个），`ai-coding`、`live-verify` 和随包附带的 `setup-matt-pocock-skills` 只在你自己没有同名技能的地方安装。用链接方式做的开发安装不会被改动。另外把 `wfc` 放到 `PATH` 上。
+   它会把 `super-coding` 装进 `~/.claude/skills` 和 `~/.codex/skills`（两者中存在的那个或两个），随包附带的 `live-verify` 和 `setup-matt-pocock-skills` 只在你自己没有同名技能的地方安装。用链接方式做的开发安装不会被改动。早期版本留下、`super-coding` 已不再需要的技能会保留，安装脚本会提示你可以自行移除。另外把 `wfc` 放到 `PATH` 上。
 
 2. **初始化项目**：如果项目的 `docs/agents/` 还没写明 tracker、标签和领域约定，先在项目里运行 `setup-matt-pocock-skills`（第 1 步已装好）。
 
@@ -114,10 +115,15 @@ flowchart TD
 │   │   ├── SKILL.md
 │   │   ├── references/
 │   │   │   ├── router.md         # 派发、等待、continue/resume、消息处理、恢复
-│   │   │   └── roles.md          # 角色表模板
+│   │   │   ├── roles.md          # 角色表模板
+│   │   │   ├── ledger.md         # 账本、任务状态、留痕
+│   │   │   ├── handoff.md        # 实施与修复的任务文件
+│   │   │   ├── review.md         # 独立审查
+│   │   │   ├── verification.md   # 验证分层与测试矩阵
+│   │   │   ├── labels.md         # Issue 标签
+│   │   │   └── release.md        # 放行交接与收尾
 │   │   └── scripts/ctl.py        # 每轮之间的例行检查
-│   ├── ai-coding/                # 原型的固定副本
-│   ├── live-verify/              # 从技能仓库分出，在本仓库维护
+│   ├── live-verify/              # 合并与真机验收，在本仓库维护
 │   ├── setup-matt-pocock-skills/ # 来自 mattpocock/skills 的第三方锁定副本
 │   └── VENDORED.md
 └── tests/
@@ -125,9 +131,9 @@ flowchart TD
     └── test_install.py           # 临时 HOME
 ```
 
-- `skills/super-coding/references/router.md` 讲派发、等待、continue/resume、消息处理和恢复。
+- `skills/super-coding/references/router.md` 讲派发、等待、continue/resume、消息处理和恢复；其余 references 是账本、交接、审查、验证、标签和放行的规则。
 - `skills/super-coding/scripts/ctl.py` 是总控每轮之间的例行检查（快照检查并记录真实退出码、回读候选、转录断网审查者的记录、切换生命周期标签）。只用 Python 标准库，另外调用 git 和 gh。技能从自己的目录运行它，所以装好技能就装好了脚本。
-- `skills/ai-coding/` 是原型的固定副本；`skills/live-verify/` 从技能仓库分出，之后在本仓库维护；`skills/setup-matt-pocock-skills/` 是来自 mattpocock/skills、未经修改的锁定副本。详见 [skills/VENDORED.md](skills/VENDORED.md)。
+- `skills/live-verify/` 从技能仓库分出，之后在本仓库维护；`skills/setup-matt-pocock-skills/` 是来自 mattpocock/skills、未经修改的锁定副本。详见 [skills/VENDORED.md](skills/VENDORED.md)。
 
 ## 与 workflow-core 的关系
 
@@ -149,6 +155,6 @@ CI 在 Ubuntu 和 macOS 上，用 Python 3.9 和 3.12 运行这些测试。
 
 ## 许可证
 
-[MIT](LICENSE) © xmxxc，适用于 `super-coding`、`ai-coding`、`live-verify` 以及本仓库的其余内容。
+[MIT](LICENSE) © xmxxc，适用于 `super-coding`、`live-verify` 以及本仓库的其余内容。
 
 随包附带的 `skills/setup-matt-pocock-skills/` 来自 [mattpocock/skills](https://github.com/mattpocock/skills)，适用 MIT 许可证，版权归 Matt Pocock 所有（Copyright (c) 2026 Matt Pocock）。它的许可证文件和它放在一起；来源提交、校验和与完整的版权声明见 [skills/VENDORED.md](skills/VENDORED.md)。[前置依赖](#来自-mattpocockskills-的技能)里列出的推荐技能不在本仓库中，适用它们各自的许可证。

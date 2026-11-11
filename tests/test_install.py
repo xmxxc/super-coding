@@ -21,12 +21,10 @@ class Install(unittest.TestCase):
         return subprocess.run([sys.executable, str(INSTALL)], capture_output=True, text=True,
                               env={**os.environ, "HOME": str(self.home)}, timeout=30)
 
-    def test_installs_the_workflow_skill_with_its_script_and_only_missing_prototypes(self):
+    def test_installs_the_workflow_skill_with_its_script_and_the_bundled_skills(self):
         claude, codex = self.home / ".claude" / "skills", self.home / ".codex" / "skills"
         claude.mkdir(parents=True)
         codex.mkdir(parents=True)
-        (claude / "ai-coding").mkdir()
-        (claude / "ai-coding" / "SKILL.md").write_text("the user's own ai-coding\n")
 
         result = self.run_install()
 
@@ -34,9 +32,21 @@ class Install(unittest.TestCase):
         for skills in (claude, codex):
             self.assertTrue((skills / "super-coding" / "SKILL.md").is_file())
             self.assertTrue((skills / "super-coding" / "scripts" / "ctl.py").is_file())
+            self.assertTrue((skills / "super-coding" / "references" / "ledger.md").is_file())
             self.assertTrue((skills / "live-verify" / "SKILL.md").is_file())
-        self.assertEqual((claude / "ai-coding" / "SKILL.md").read_text(), "the user's own ai-coding\n")
-        self.assertTrue((codex / "ai-coding" / "SKILL.md").is_file())
+            self.assertTrue((skills / "setup-matt-pocock-skills" / "SKILL.md").is_file())
+            self.assertFalse((skills / "ai-coding").exists())
+
+    def test_an_existing_ai_coding_is_kept_and_reported_as_no_longer_needed(self):
+        skills = self.home / ".claude" / "skills"
+        (skills / "ai-coding").mkdir(parents=True)
+        (skills / "ai-coding" / "SKILL.md").write_text("the user's own ai-coding\n")
+
+        result = self.run_install()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((skills / "ai-coding" / "SKILL.md").read_text(), "the user's own ai-coding\n")
+        self.assertIn(f"{skills / 'ai-coding'}: super-coding no longer depends on it", result.stdout)
 
     def test_the_users_own_live_verify_is_never_overwritten(self):
         skills = self.home / ".claude" / "skills"
