@@ -18,7 +18,9 @@ disable-model-invocation: true
 - **Codex**：在总控会话里启动一次 `wfc relay --codex --detach`，消息会作为新的一轮送到你这里。总控会话用 `danger-full-access` 启动。
 - **OpenCode**：总控会话要用固定端口启动（`opencode <目录> --port <端口>`）。接管后启动一次 `wfc relay --opencode-url … --opencode-session … --detach`，消息会作为新的一轮送到你这里。
 
-需要 `wfc` 0.4.4 及以上版本。各宿主的具体命令和恢复步骤，都在 [router 派发](references/router.md)。
+需要 `wfc` 0.4.4 及以上版本。把 `wfc --version` 记进账本；之后版本与记录不一致或用户说已经升级时，先停掉旧的 `wait` 或 relay，再按宿主重新启动唯一的一个，并记下新的进程号和版本。各宿主的具体命令和恢复步骤，都在 [router 派发](references/router.md)。
+
+每次被唤醒，处理完消息都要对账一次：有就绪的票、实施或审查有空位，就继续派发；只剩需要用户授权的事项（合并、真机验收、生产操作、回收）时，结束这一轮，并列出在等用户做什么。对账每次唤醒只做一次，没有新动作就结束，不要空转。做法见 [router 派发](references/router.md) 的"唤醒后对账"。
 
 ## 派给谁
 
@@ -41,5 +43,5 @@ disable-model-invocation: true
 
 与 ai-coding 相同，另外加两条：
 
-- 每个 dispatch 的最终状态都记入账本：`returned`、`stale` 或 `blocked`，并写明原因。
+- 每个 dispatch 的最终状态都记入账本：`returned`、`stale` 或 `blocked`，并写明原因。已记为 `stale` 的会话再发来通知时，记一笔，并在回收清单里提议用 `wfc reclaim --dispatch <id>` 回收，用户同意后再加 `--yes` 执行，不要只记"已忽略"。
 - 范围完成时，停掉 relay，列出 tmux 会话、worktree、已合并 PR 的实施分支（本地和远端）、router 状态目录和端口占用，作为回收清单交给用户；会话用 `wfc reclaim` 列出、用户同意后再加 `--yes` 关闭，做法见 [router 派发](references/router.md) 的“会话的生命周期”。回收是否执行由用户决定。在此之前，worker 的会话一律保留。

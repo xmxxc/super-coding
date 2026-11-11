@@ -4,7 +4,7 @@
 
 ## 前提
 
-- **wfc 命令**：先运行 `wfc --version` 确认它在 PATH 上，并把版本号记进 `state.md`。如果没有，请用户从 xmxxc/workflow-core 的 Releases 下载 `wfc`，放进 PATH（例如 `~/.local/bin`）。本技能与 `wfc` 分开发布：技能（含 `scripts/ctl.py`）来自 xmxxc/super-coding。系统要求：Linux 或 macOS（Windows 请用 WSL2），装有 python3 和 tmux。
+- **wfc 命令**：先运行 `wfc --version` 确认它在 PATH 上，并把版本号记进 `state.md`。之后版本与这条记录不一致时，按下面的[升级 wfc 之后](#升级-wfc-之后)处理。如果没有，请用户从 xmxxc/workflow-core 的 Releases 下载 `wfc`，放进 PATH（例如 `~/.local/bin`）。本技能与 `wfc` 分开发布：技能（含 `scripts/ctl.py`）来自 xmxxc/super-coding。系统要求：Linux 或 macOS（Windows 请用 WSL2），装有 python3 和 tmux。
 - **状态目录**：每个范围用一个独立的 `WFC_STATE`，例如 `~/.local/state/workflow-core/<仓库>-<范围>`。对这个范围执行的每条 router 命令都要带上它，并把它写进 `state.md`。
 - **同一个 tmux 服务**：每个 worker 在名为 `wfc-<dispatch id>` 的 tmux 会话里运行。总控、worker，以及用户执行 `tmux attach` 时，都要连到同一个 tmux 服务（同一个用户、同一个 `TMUX_TMPDIR`）。看门狗找不到会话，就会报 `exited`。
 - **信任**：
@@ -135,7 +135,7 @@ WFC_STATE=<状态目录> wfc wait --timeout <秒> [--stall-after <秒>]
 WFC_STATE=<状态目录> wfc relay --codex --detach [--stall-after <秒>]
 ```
 
-`--codex` 从 Codex 为命令设置的 `CODEX_THREAD_ID` 取本会话的线程，并在启动前核对对应的 rollout，所以必须在总控会话自己的命令里运行。它会输出进程号和日志路径，把它们写进 `state.md`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。relay 启动后，要确认它投递的第一条消息确实到了你这里。relay 报 `no rollout found` 并退出（启动时拒绝，或投递时 `codex queue` 找不到会话）时，说明线程不对：回头检查是不是在总控会话里运行的，不要换个 ID 硬试。如果派发后迟迟没有动静，先用 `wfc status --active` 和 `relay.log` 看消息是否已经标为送达。
+`--codex` 从 Codex 为命令设置的 `CODEX_THREAD_ID` 取本会话的线程，并在启动前核对对应的 rollout，所以必须在总控会话自己的命令里运行。它会输出进程号和日志路径，把它们连同启动它的 `wfc --version` 一起写进 `state.md`。每次派发或回复之后结束当前回复，worker 的消息会作为一条以 `[router] Messages for the controller:` 开头的新消息送到你这里。全程不要运行 `wait`：`wait` 和 relay 同时运行，会抢同一批消息。relay 启动后，要确认它投递的第一条消息确实到了你这里。relay 报 `no rollout found` 并退出（启动时拒绝，或投递时 `codex queue` 找不到会话）时，说明线程不对：回头检查是不是在总控会话里运行的，不要换个 ID 硬试。如果派发后迟迟没有动静，先用 `wfc status --active` 和 `relay.log` 看消息是否已经标为送达。
 
 **OpenCode 总控**：总控会话必须用固定端口启动，例如 `opencode <工作目录> --port 4096`（默认端口是随机的，relay 找不到）。接管后执行一次
 
@@ -146,7 +146,36 @@ WFC_STATE=<状态目录> wfc relay --opencode-url http://127.0.0.1:<端口> --op
 会话 id 的确认：目录和更新时间只能用来缩小范围，不能证明哪个会话是你，因为同一目录下可能还有别的会话。做法如下：
 1. 启动总控时，在第一条提示里放一个唯一标记，例如 `wfc-controller-<范围>-<随机串>`，并把这个标记写进 `state.md`。
 2. 用 `curl -s http://127.0.0.1:<端口>/session` 列出 `directory` 等于本工作目录的候选会话，再逐个读取 `GET /session/<id>/message`，找出用户消息中含有这个标记的会话。必须恰好命中一个；命中零个或多个时，不要启动 relay，先把身份问题弄清楚。
-3. relay 启动后，核对它投递的第一条消息确实进入了当前会话（这一点和 Codex 一样），然后把确认过的 `ses_…` 写进 `state.md`。和 Codex 一样，把进程号和日志路径写进 `state.md`，全程不要运行 `wait`。每次派发或回复之后结束当前回复，worker 的消息会以 `[router] Messages for the controller:` 开头的新一轮送达。连接被拒（OpenCode 没在监听）时，消息留着下次再送；OpenCode 返回错误或超时时，消息不会重发，`relay.log` 会记成 uncertain，这时去会话里核对是否收到。
+3. relay 启动后，核对它投递的第一条消息确实进入了当前会话（这一点和 Codex 一样），然后把确认过的 `ses_…` 写进 `state.md`。和 Codex 一样，把进程号、日志路径和启动它的 `wfc --version` 写进 `state.md`，全程不要运行 `wait`。每次派发或回复之后结束当前回复，worker 的消息会以 `[router] Messages for the controller:` 开头的新一轮送达。连接被拒（OpenCode 没在监听）时，消息留着下次再送；OpenCode 返回错误或超时时，消息不会重发，`relay.log` 会记成 uncertain，这时去会话里核对是否收到。
+
+### 唤醒后对账
+
+每次被唤醒（worker 的消息、`wait` 返回、relay 投递、用户发言），按下面的消息处理表处理完消息之后，都按 [ai-coding 的"每轮先对账"](../../ai-coding/SKILL.md) 对账一次，再决定这一轮怎么结束。对账看三件事：
+
+1. **就绪的票**：账本里依赖已满足、还没有派发的票，以及审查、修复、复核里可以进入下一步的票。
+2. **空位**：按角色表和账本，实施和审查还能再开几个会话；正在 `working`、`asking` 的 dispatch 占着位置，`blocked` 的只占它自己那张票。
+3. **等用户决定的事项**：转给用户的问题、合并、真机验收、生产操作、回收清单等需要用户授权的事。
+
+然后：
+
+- 有就绪的票并且有空位，就在这一轮里继续派发或续派，再按宿主等待。不要因为这次唤醒只是一条旧通知、或者消息已经处理完，就把能派的票留着不派。
+- 没有能派的票，但还有 worker 在工作，就结束这一轮，等它们的消息。
+- 只剩需要用户授权的事项时，结束这一轮，在回复里逐条列出"在等用户做什么"：哪张票、要用户做什么（例如合并 PR、真机验收、同意回收）、结果交回哪里。
+
+对账每次唤醒只做一次，不能空转：对账之后没有新的派发、续派或要问用户的事，就直接结束这一轮，不要为了"再看一眼"去反复查状态、挂短超时的 `wait` 或给自己发提醒。
+
+### 升级 wfc 之后
+
+`wait` 和 relay 是长时间运行的进程，升级 `wfc` 之后它们还在跑旧代码，新版本的行为（例如只读会话的检测）对它们不生效。所以每次被唤醒时，如果 `wfc --version` 和 `state.md` 里记录的版本不一致，或者用户说已经升级了 `wfc`，在对账之前先重启等待进程：
+
+1. 用 `WFC_STATE=<状态目录> wfc status --active` 的 `waiters`（`pid`、`kind`、`since`）找出本状态目录里的 `wait` 和 relay，与 `state.md` 记录的进程号核对；必要时用 `ps -o args= -p <进程号>` 确认它是本状态目录的 `wfc wait` 或 `wfc relay`。不认识的进程不要动，先问用户。
+2. 停掉旧的：`kill <进程号>`，再运行 `wfc status --active`，确认 `waiters` 里已经没有它。
+3. 按宿主重新启动唯一的一个：
+   - **Claude Code**：没有 relay，等待进程就是后台的 `wfc wait`。停掉旧的后台 `wait`（`kind` 为 `wait` 的那个进程），用新版本重新挂一个 `wait`。
+   - **Codex**：在总控会话自己的命令里运行 `WFC_STATE=<状态目录> wfc relay --codex --detach [--stall-after <秒>]`。
+   - **OpenCode**：用 `state.md` 里已经确认过的 URL 和 `ses_…`，运行 `WFC_STATE=<状态目录> wfc relay --opencode-url … --opencode-session … --detach [--stall-after <秒>]`；不确定时，先按上面的唯一标记流程重新确认。
+4. 用 `wfc status --active` 确认 `waiters` 里只有新启动的这一个；Codex 和 OpenCode 还要核对 relay 投递的第一条消息确实到了当前会话。
+5. 把新的版本号、新的进程号（relay 还有日志路径）记进 `state.md`，旧进程的停止也记一笔。
 
 **查看状态**：`wait` 超时，或者怀疑丢了消息时，先运行
 
@@ -166,7 +195,11 @@ WFC_STATE=<状态目录> wfc status --active
 | `blocked` | worker 的本轮因宿主报错而结束。消息附带宿主的错误类型 `kind` 和原文 `message`。先读原文，再按类型处理：<br>额度耗尽（`usage_limit_exceeded`、`rate_limit`）或认证失败（401、`token expired` 之类）：角色表里该角色配了备用、备用宿主不是当前失败的这个、而且这一轮还没有因为账号问题试过它时，按上面的改派换到备用宿主和模型，旧 dispatch 记为 `stale`，并把已经试过的宿主记进账本；没配备用的，或者备用也已失败的，该任务记为 `blocked`，请用户修复认证或者处理额度，问题解决前不要再为同一个宿主新开会话：额度耗尽的，由用户决定是等到原文里的恢复时间再 `nudge` 一次，还是另换宿主；认证失败的，请用户重新登录 worker 用的命令行，登录后再 `nudge` 一次。不要对同一个宿主反复 `nudge`，也不要新开会话硬试。总控和 worker 可能用不同的认证（例如总控是 VS Code 扩展，worker 是经本地网关的命令行），总控能正常对话，不代表 worker 能用。<br>会话只读（`session_read_only`）：宿主切换了服务商或账号，旧会话变成只读或不可用，`resume` 也只能看到只读界面；`message` 是画面原文，例如 Codex 的 `… so this chat is read-only.`。把旧 dispatch 记为 `stale`，保留现场，然后按角色表在**同一宿主上新开会话**（新会话用的是新服务商，可以正常工作），用下一轮编号，按上面改派的要求在新任务文件里写明真实起点。`continue`、`nudge`、`reply` 报会话只读时（本次记录已回滚，没有送出），也这样处理；`reply` 没送出的答案写进新任务文件。<br>认证失败和会话只读的区别：认证失败是账号本身不能用，同一宿主的新会话一样会失败，所以不要新开会话硬试，按角色表改派或者请用户处理；会话只读是旧会话不能用，账号没有问题，同一宿主的新会话可以用。按 `kind` 和原文区分：`session_read_only`、原文说会话只读或不可用的，是会话只读；401、`token expired` 之类的，是认证失败。<br>短暂故障（`server_overloaded`、5xx）：过一会儿再 `nudge`。<br>内容策略（`cyber_policy`）：调整任务措辞后再发给它。<br>每次处理都记入账本 |
 | `exited` | 先检查 worker 退出前是否已经提交或推送，再用 `resume <dispatch>` 让它回到原会话，接着做当前任务，并记入账本。`resume` 报会话只读时，按上面 `blocked` 行里会话只读的办法处理。`resume` 找不到会话或者再次 `exited` 时，按账本的失效规则处理：记为 `stale`，保留现场，用下一轮编号新派，在新任务文件里写明真实起点，以及旧现场是续用还是放弃 |
 
-每条消息都带 dispatch id，对照账本找到它所属的票和任务。记为 `blocked` 的任务，在 `state.md` 写清楚在等谁、要做什么、结果交回哪里。
+每条消息都带 dispatch id，对照账本找到它所属的票和任务。
+
+**来自已记为 `stale` 的 dispatch 的消息**（例如旧的只读会话反复报 `stalled` 或 `exited`）：不再按上表处理，也不续派。先在账本里记一笔，然后把它列进回收清单，向用户提议回收：先运行 `WFC_STATE=<状态目录> wfc reclaim --dispatch <id>` 预览（它会标出任务没有完成），用户同意后再加 `--yes` 关闭，按[会话的生命周期](#会话的生命周期)回读结果。用户还没答复时，后面同一个会话再来通知只记一笔，不重复提议；不要每次只写"已忽略"就结束这一轮，处理完照常按[唤醒后对账](#唤醒后对账)继续推进。
+
+记为 `blocked` 的任务，在 `state.md` 写清楚在等谁、要做什么、结果交回哪里。
 
 ## worker 的授权
 
