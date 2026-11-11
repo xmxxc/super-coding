@@ -79,7 +79,7 @@ At run time these skills call, or rely on, skills from the public [mattpocock/sk
    python3 install.py
    ```
 
-   It installs `super-coding` into `~/.claude/skills` and `~/.codex/skills` (for each of the two that exists), and installs the bundled `live-verify` and `setup-matt-pocock-skills` only where you have none of your own. A linked development install is left alone. A skill left over from an earlier release that `super-coding` no longer needs is kept, and the installer says you can remove it. Put `wfc` on your `PATH` as well.
+   It installs `super-coding` into `~/.claude/skills` and `~/.codex/skills` (for each of the two that exists), and installs the bundled `live-verify` and `setup-matt-pocock-skills` only where you have none of your own. When your own copy differs from the bundled one, the installer names the differing files and leaves your copy as it is. A linked development install is left alone. A skill left over from an earlier release that `super-coding` no longer needs is kept, and the installer says you can remove it. Put `wfc` on your `PATH` as well.
 
 2. **Initialize the project.** If `docs/agents/` does not yet describe the issue tracker, labels and domain, run `setup-matt-pocock-skills` (installed in step 1) in the project.
 

@@ -1,6 +1,6 @@
 ---
 name: super-coding
-description: "多票据开发总控（router 版）：用 workflow-core router 把实施与独立审查派发到 Codex、OpenCode 或 Claude Code 会话，总控睡眠、由 worker 消息唤醒；修复复用原会话并增量复核，放行前最终完整审查。"
+description: "多票据开发总控：用 wfc 把实施和独立审查派发到 Codex、OpenCode 或 Claude Code 会话，维护账本与留痕直到放行，适用于跨多张票、需要独立审查的开发。"
 disable-model-invocation: true
 ---
 
@@ -11,6 +11,8 @@ disable-model-invocation: true
 ## 授权
 
 用户手动调用并指定仓库和范围，即授权你读取项目与 tracker、维护本范围账本、按项目标签映射切换 Issue 标签、发布里程碑与转录评论。worker 的授权见 [router 派发](references/router.md#worker-的授权)。正式合并、部署、生产数据和真实平台操作只按项目已有授权或用户本轮的明确授权执行。
+
+本范围账本里已经记录的授权直接沿用，不重复询问；只有缺少授权、对象扩大或操作性质改变时才问用户，问到的答复记入账本。生产操作、正式合并和删除资产（关闭会话、删除分支或 worktree、清理数据）的边界不变：仍只按项目已有授权或用户对具体对象的明确同意执行。
 
 ## 你在哪个宿主
 
@@ -33,7 +35,9 @@ disable-model-invocation: true
 
 每次被唤醒，处理完消息都先对账：回读账本和权威来源；选出就绪票，只暂停受阻票及其依赖；有就绪的票、实施或审查有空位，就继续派发；回收结果并核对要求的留痕；最后更新账本。只剩需要用户授权的事项（合并、真机验收、生产操作、回收）时，结束这一轮，并列出在等用户做什么。对账每次唤醒只做一次，没有新动作就结束，不要空转。做法见 [router 派发](references/router.md#唤醒后对账) 的"唤醒后对账"。
 
-## 按场景读取
+## 按阶段读取
+
+各条规则到了对应阶段再读，不要求一开始全部读完：
 
 - 接管、恢复、意外中断或换宿主：[账本](references/ledger.md)
 - 派发、续派、等待、处理 worker 消息、回收会话：[router 派发](references/router.md)

@@ -82,6 +82,33 @@ class Install(unittest.TestCase):
                          "the user's own setup skill\n")
         self.assertFalse((skills / "setup-matt-pocock-skills" / "domain.md").exists())
 
+    def test_a_kept_skill_that_differs_from_the_bundled_copy_is_reported(self):
+        skills = self.home / ".claude" / "skills"
+        (skills / "live-verify").mkdir(parents=True)
+        (skills / "live-verify" / "SKILL.md").write_text("the user's own live-verify\n")
+
+        result = self.run_install()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((skills / "live-verify" / "SKILL.md").read_text(), "the user's own live-verify\n")
+        line = next(l for l in result.stdout.splitlines() if l.startswith(f"{skills / 'live-verify'}:"))
+        self.assertIn("left alone", line)
+        self.assertIn("differs from the bundled copy", line)
+        self.assertIn("SKILL.md", line)
+        self.assertIn("references/acceptance.md", line)  # missing from the user's copy
+        self.assertIn(str(ROOT / "skills" / "live-verify"), line)
+
+    def test_a_kept_skill_identical_to_the_bundled_copy_is_not_reported(self):
+        skills = self.home / ".claude" / "skills"
+        skills.mkdir(parents=True)
+        self.run_install()
+
+        result = self.run_install()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("differs", result.stdout)
+        self.assertIn(f"{skills / 'setup-matt-pocock-skills'}: left alone (already installed)\n", result.stdout)
+
     def test_a_second_install_replaces_the_workflow_skill(self):
         skills = self.home / ".claude" / "skills"
         skills.mkdir(parents=True)

@@ -5,10 +5,10 @@
 
 Installs `super-coding` (replacing an earlier installed copy) into ~/.claude/skills and
 ~/.codex/skills, for each of the two that exists. The bundled `live-verify` and
-`setup-matt-pocock-skills` are installed only where the user has none of their own. A linked
-development install (a symlink) is left alone. An `ai-coding` from an earlier release is kept, with a
-note that super-coding no longer depends on it. The dispatcher, `wfc`, comes from
-xmxxc/workflow-core.
+`setup-matt-pocock-skills` are installed only where the user has none of their own; a kept copy
+that differs from the bundled one is reported, never overwritten. A linked development install (a
+symlink) is left alone. An `ai-coding` from an earlier release is kept, with a note that
+super-coding no longer depends on it. The dispatcher, `wfc`, comes from xmxxc/workflow-core.
 """
 
 import shutil
@@ -21,13 +21,29 @@ BUNDLED = ("live-verify", "setup-matt-pocock-skills")
 RETIRED = "ai-coding"  # merged into super-coding in 0.5.0
 
 
+def files(root):
+    """Each file under `root` by its relative path, with its bytes."""
+    return {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+
+
+def drift(name, installed):
+    """The relative paths where an installed skill differs from the bundled copy."""
+    ours, theirs = files(HERE / "skills" / name), files(installed)
+    return sorted(path for path in ours.keys() | theirs.keys() if ours.get(path) != theirs.get(path))
+
+
 def install_skill(name, target, replace):
     """Install one skill into `target`. Returns what happened, for the report."""
     destination = target / name
     if destination.is_symlink():
         return f"{destination}: left alone (a linked development install)"
     if destination.exists() and not replace:
-        return f"{destination}: left alone (already installed)"
+        changed = drift(name, destination)
+        if not changed:
+            return f"{destination}: left alone (already installed)"
+        shown = ", ".join(changed[:5]) + (f" and {len(changed) - 5} more" if len(changed) > 5 else "")
+        return (f"{destination}: left alone (already installed); it differs from the bundled copy in "
+                f"{shown}; compare it with {HERE / 'skills' / name} and update it yourself if needed")
     staging = target / f".{name}.install-new"
     shutil.rmtree(staging, ignore_errors=True)
     shutil.copytree(HERE / "skills" / name, staging)

@@ -1,6 +1,6 @@
 # router 派发
 
-用 `wfc` 命令把 worker 和审查者派到各自宿主的 tmux 会话里，然后你去睡眠，等它们发来消息再醒。账本、交接、审查、验证和放行的规则在本目录的其他文件里，按 [SKILL.md](../SKILL.md#按场景读取) 的场景读取。
+用 `wfc` 命令把 worker 和审查者派到各自宿主的 tmux 会话里，然后你去睡眠，等它们发来消息再醒。账本、交接、审查、验证和放行的规则在本目录的其他文件里，按 [SKILL.md](../SKILL.md#按阶段读取) 在对应阶段读取。
 
 ## 前提
 
@@ -38,7 +38,7 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
 
 派发之前，先准备两样东西，都放进它的回报目录：
 
-- 在固定快照上执行项目的全量检查（安装、类型检查、lint、格式、测试），保存日志，并记录每条命令真实的退出码；
+- 在固定快照上执行本轮的检查，保存日志，并记录每条命令真实的退出码。检查的层级按 [验证分层与测试矩阵](verification.md) 为本轮选定，仍能覆盖当前候选的已有证据可以复用并写明来源；最终完整审查要在确切的 head 上跑完整检查（安装、类型检查、lint、格式、测试）；
 - 需求来源，也就是 Issue 和 spec 正文的本地副本。它的沙箱不能联网，读不到 GitHub，所以任务文件里要写明这些副本的路径。
 
 审查结论写进报告，标为"待发布"。由你注明原作者后，转录到 PR 上。
@@ -47,19 +47,20 @@ WFC_STATE=<状态目录> wfc dispatch --host <codex|opencode|claude> [--model <�
 
 ### 总控例行检查
 
-每一轮都要做的四件事，统一用本技能自带的脚本 `scripts/ctl.py` 执行（下面的 `<ctl>` 指 `python3 <本技能目录>/scripts/ctl.py`；本技能目录就是这份 SKILL.md 所在的目录），不要每次临时拼命令。每条命令都输出一份 JSON，任何一项检查不通过时退出码为 1。
+本技能自带的脚本 `scripts/ctl.py` 有四个子命令，按本轮的动作调用对应的那个，不要每次临时拼命令（下面的 `<ctl>` 指 `python3 <本技能目录>/scripts/ctl.py`；本技能目录就是 SKILL.md 所在的目录）。每条命令都输出一份 JSON，任何一项检查不通过时退出码为 1。
 
 ```sh
-# 1. 把审查快照切到新 head，跑全量检查，日志记录每条命令真实的退出码（用 pipefail）
+# checks：审查快照要验证某个 head 时。切到该 head，跑本轮选定层级的检查（最终完整审查和放行时为完整检查），
+# 日志记录每条命令真实的退出码（用 pipefail）
 <ctl> checks --cwd <审查快照> --head <sha> --log <reports/…/verification-rN.log> \
   --cmd "pnpm install --frozen-lockfile" --cmd "pnpm typecheck" --cmd "pnpm test" …
-# 2. 回读候选：远端 head、tree、未 force-push、密钥没有提交、没有关闭关键词、留痕评论存在、端口已释放
+# candidate：回读推送的候选时。远端 head、tree、未 force-push、密钥没有提交、没有关闭关键词、留痕评论存在、端口已释放
 <ctl> candidate --git <仓库克隆> --repo <owner/name> --branch <分支> --head <sha> \
   [--since <上次获审候选>] [--pr <N>] [--secret-file <.env> --secret-key PGPASSWORD] [--comment <id> …] [--port <端口>]
-# 3. 把断网审查者的报告段落转录到 PR（带原作者说明，正文不改）
+# transcribe：转录断网审查者的报告段落到 PR 时（带原作者说明，正文不改）
 <ctl> transcribe --repo <owner/name> --pr <N> --report <r2.md> --start "## 独立复核记录" \
   [--end "## 最终完整审查状态"] --author 'Codex 审查者（router dispatch `d-…`）'
-# 4. 切换生命周期标签并回读
+# label：切换生命周期标签时，切换后回读
 <ctl> label --repo <owner/name> --issue <N> --from in-review --to changes-requested
 ```
 
@@ -76,7 +77,7 @@ WFC_STATE=<状态目录> wfc continue <dispatch> --task <下一轮任务文件> 
 ```
 
 - **修复**：审查有阻塞时，用 `continue` 把修复任务交给原来的实施者。任务文件里写明审查记录的链接、要修的各项、当前 head，以及"在现有提交上追加，不要 force-push"。
-- **增量复核**：修复报告 `returned` 之后，把审查快照移到新的 head，在快照上执行全量检查，然后用 `continue` 让原来的审查者复核"上次获审候选 → 新 head"。
+- **增量复核**：修复报告 `returned` 之后，把审查快照移到新的 head，在快照上执行按 [验证分层与测试矩阵](verification.md) 为增量复核选定的检查（仍能覆盖当前候选的证据可以复用），然后用 `continue` 让原来的审查者复核"上次获审候选 → 新 head"。
 - **何时可以续派**：只有在该 dispatch 已经对当前任务报告 `done` 之后才行。`continue` 发现上一轮还没有 `done`，会直接报错。
 - **会话已经结束**（`exited`、误关或被 Ctrl-C）：用 `resume` 把 worker 重新拉回它原来的宿主会话，上下文都还在。会话结束时，`continue` 会直接报错，不会把任务打进去。
 - **会话只读**：宿主切换了服务商或账号后，旧会话变成只读或不可用。`continue` 遇到这种会话会报错，带上画面原文，本轮记录回滚，任务没有送出。这时按消息处理表里 `session_read_only` 的办法，在同一宿主上新开会话。

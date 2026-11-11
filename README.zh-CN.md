@@ -79,7 +79,7 @@ flowchart TD
    python3 install.py
    ```
 
-   它会把 `super-coding` 装进 `~/.claude/skills` 和 `~/.codex/skills`（两者中存在的那个或两个），随包附带的 `live-verify` 和 `setup-matt-pocock-skills` 只在你自己没有同名技能的地方安装。用链接方式做的开发安装不会被改动。早期版本留下、`super-coding` 已不再需要的技能会保留，安装脚本会提示你可以自行移除。另外把 `wfc` 放到 `PATH` 上。
+   它会把 `super-coding` 装进 `~/.claude/skills` 和 `~/.codex/skills`（两者中存在的那个或两个），随包附带的 `live-verify` 和 `setup-matt-pocock-skills` 只在你自己没有同名技能的地方安装；你自己的副本和随包的不一致时，安装脚本会列出不同的文件，但不覆盖你的副本。用链接方式做的开发安装不会被改动。早期版本留下、`super-coding` 已不再需要的技能会保留，安装脚本会提示你可以自行移除。另外把 `wfc` 放到 `PATH` 上。
 
 2. **初始化项目**：如果项目的 `docs/agents/` 还没写明 tracker、标签和领域约定，先在项目里运行 `setup-matt-pocock-skills`（第 1 步已装好）。
 
