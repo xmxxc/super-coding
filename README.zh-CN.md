@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/banner.png" alt="super-coding 横幅：总控分派到一排 worker 步骤，最后以对勾收尾" width="100%">
+</p>
+
 # super-coding
 
 [English](README.md) | **简体中文**
@@ -59,12 +63,12 @@ flowchart TD
 
 ### 来自 mattpocock/skills 的技能
 
-这几个技能运行时会调用或依赖公开仓库 [mattpocock/skills](https://github.com/mattpocock/skills) 里的技能。**本仓库不打包它们**，需要另外安装。
+这几个技能运行时会调用或依赖公开仓库 [mattpocock/skills](https://github.com/mattpocock/skills) 里的技能。
 
-| 技能 | 用途 |
-| --- | --- |
-| [`setup-matt-pocock-skills`](https://github.com/mattpocock/skills/tree/main/skills/engineering/setup-matt-pocock-skills) | 项目没有初始化（`docs/agents/` 里缺 tracker、标签或领域配置）时，`ai-coding`（因而也包括 `super-coding`）和 `live-verify` 会先调用它。每个项目先跑一次。 |
-| [`code-review`](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review)、[`implement`](https://github.com/mattpocock/skills/tree/main/skills/engineering/implement)、[`tdd`](https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd) | worker 用到的通用开发技能。任务文件不点名这些技能，而是让执行者按项目已安装的开发工作流选择方法，所以请装好你希望 worker 使用的技能。 |
+| 技能 | 状态 | 用途 |
+| --- | --- | --- |
+| [`setup-matt-pocock-skills`](https://github.com/mattpocock/skills/tree/main/skills/engineering/setup-matt-pocock-skills) | **已随包附带**：`skills/setup-matt-pocock-skills/` 是一份未经修改的锁定副本，`install.py` 只在你自己没有同名技能时安装它。 | 项目没有初始化（`docs/agents/` 里缺 tracker、标签或领域配置）时，`ai-coding`（因而也包括 `super-coding`）和 `live-verify` 会先调用它。每个项目先跑一次。 |
+| [`code-review`](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review)、[`implement`](https://github.com/mattpocock/skills/tree/main/skills/engineering/implement)、[`tdd`](https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd) | **推荐，不随包附带**，需要另外安装。 | worker 用到的通用开发技能。任务文件不点名这些技能，而是让执行者按项目已安装的开发工作流选择方法，所以请装好你希望 worker 使用的技能。 |
 
 ## 快速开始
 
@@ -74,9 +78,9 @@ flowchart TD
    python3 install.py
    ```
 
-   它会把 `super-coding` 装进 `~/.claude/skills` 和 `~/.codex/skills`（两者中存在的那个或两个），`ai-coding` 和 `live-verify` 两个原型只在你自己没有同名技能的地方安装。用链接方式做的开发安装不会被改动。另外把 `wfc` 放到 `PATH` 上。
+   它会把 `super-coding` 装进 `~/.claude/skills` 和 `~/.codex/skills`（两者中存在的那个或两个），`ai-coding`、`live-verify` 和随包附带的 `setup-matt-pocock-skills` 只在你自己没有同名技能的地方安装。用链接方式做的开发安装不会被改动。另外把 `wfc` 放到 `PATH` 上。
 
-2. **初始化项目**：如果项目的 `docs/agents/` 还没写明 tracker、标签和领域约定，先在项目里运行 `setup-matt-pocock-skills`。
+2. **初始化项目**：如果项目的 `docs/agents/` 还没写明 tracker、标签和领域约定，先在项目里运行 `setup-matt-pocock-skills`（第 1 步已装好）。
 
 3. **写角色表**：把 [skills/super-coding/references/roles.md](skills/super-coding/references/roles.md) 里的模板复制到 `docs/agents/roles.md`，按项目修改。表不存在时，总控会先问你，再把你的回答写进这张表。
 
@@ -103,6 +107,7 @@ flowchart TD
 
 ```text
 .
+├── docs/assets/banner.png
 ├── install.py                    # 安装脚本
 ├── skills/
 │   ├── super-coding/             # 总控技能
@@ -113,6 +118,7 @@ flowchart TD
 │   │   └── scripts/ctl.py        # 每轮之间的例行检查
 │   ├── ai-coding/                # 原型的固定副本
 │   ├── live-verify/              # 从技能仓库分出，在本仓库维护
+│   ├── setup-matt-pocock-skills/ # 来自 mattpocock/skills 的第三方锁定副本
 │   └── VENDORED.md
 └── tests/
     ├── test_ctl.py               # 真实 git，模拟 gh
@@ -121,7 +127,7 @@ flowchart TD
 
 - `skills/super-coding/references/router.md` 讲派发、等待、continue/resume、消息处理和恢复。
 - `skills/super-coding/scripts/ctl.py` 是总控每轮之间的例行检查（快照检查并记录真实退出码、回读候选、转录断网审查者的记录、切换生命周期标签）。只用 Python 标准库，另外调用 git 和 gh。技能从自己的目录运行它，所以装好技能就装好了脚本。
-- `skills/ai-coding/` 是原型的固定副本；`skills/live-verify/` 从技能仓库分出，之后在本仓库维护。详见 [skills/VENDORED.md](skills/VENDORED.md)。
+- `skills/ai-coding/` 是原型的固定副本；`skills/live-verify/` 从技能仓库分出，之后在本仓库维护；`skills/setup-matt-pocock-skills/` 是来自 mattpocock/skills、未经修改的锁定副本。详见 [skills/VENDORED.md](skills/VENDORED.md)。
 
 ## 与 workflow-core 的关系
 
@@ -143,4 +149,6 @@ CI 在 Ubuntu 和 macOS 上，用 Python 3.9 和 3.12 运行这些测试。
 
 ## 许可证
 
-[MIT](LICENSE) © xmxxc。本仓库的三个技能（`super-coding`、`ai-coding`、`live-verify`）都是原创内容。[前置依赖](#来自-mattpocockskills-的技能)里列出的 mattpocock/skills 技能不在本仓库中，需另外安装，适用它们各自的许可证。
+[MIT](LICENSE) © xmxxc，适用于 `super-coding`、`ai-coding`、`live-verify` 以及本仓库的其余内容。
+
+随包附带的 `skills/setup-matt-pocock-skills/` 来自 [mattpocock/skills](https://github.com/mattpocock/skills)，适用 MIT 许可证，版权归 Matt Pocock 所有（Copyright (c) 2026 Matt Pocock）。它的许可证文件和它放在一起；来源提交、校验和与完整的版权声明见 [skills/VENDORED.md](skills/VENDORED.md)。[前置依赖](#来自-mattpocockskills-的技能)里列出的推荐技能不在本仓库中，适用它们各自的许可证。

@@ -49,6 +49,29 @@ class Install(unittest.TestCase):
         self.assertEqual((skills / "live-verify" / "SKILL.md").read_text(), "the user's own live-verify\n")
         self.assertFalse((skills / "live-verify" / "references").exists())
 
+    def test_setup_matt_pocock_skills_is_installed_where_missing(self):
+        skills = self.home / ".claude" / "skills"
+        skills.mkdir(parents=True)
+
+        result = self.run_install()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for name in ("SKILL.md", "LICENSE", "triage-labels.md"):
+            self.assertEqual((skills / "setup-matt-pocock-skills" / name).read_bytes(),
+                             (ROOT / "skills" / "setup-matt-pocock-skills" / name).read_bytes())
+
+    def test_the_users_own_setup_matt_pocock_skills_is_never_overwritten(self):
+        skills = self.home / ".claude" / "skills"
+        (skills / "setup-matt-pocock-skills").mkdir(parents=True)
+        (skills / "setup-matt-pocock-skills" / "SKILL.md").write_text("the user's own setup skill\n")
+
+        result = self.run_install()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((skills / "setup-matt-pocock-skills" / "SKILL.md").read_text(),
+                         "the user's own setup skill\n")
+        self.assertFalse((skills / "setup-matt-pocock-skills" / "domain.md").exists())
+
     def test_a_second_install_replaces_the_workflow_skill(self):
         skills = self.home / ".claude" / "skills"
         skills.mkdir(parents=True)

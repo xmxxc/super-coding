@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/banner.png" alt="super-coding banner: a controller fanning out to a row of worker steps that ends in a check mark" width="100%">
+</p>
+
 # super-coding
 
 **English** | [简体中文](README.zh-CN.md)
@@ -59,12 +63,12 @@ Review semantics (full, incremental and final), independence rules and record fo
 
 ### Skills from mattpocock/skills
 
-At run time these skills call, or rely on, skills from the public [mattpocock/skills](https://github.com/mattpocock/skills) repository. They are **not bundled here**; install them separately.
+At run time these skills call, or rely on, skills from the public [mattpocock/skills](https://github.com/mattpocock/skills) repository.
 
-| Skill | How it is used |
-| --- | --- |
-| [`setup-matt-pocock-skills`](https://github.com/mattpocock/skills/tree/main/skills/engineering/setup-matt-pocock-skills) | Called by `ai-coding` (and so by `super-coding`) and by `live-verify` when the project is not initialized, that is, when `docs/agents/` lacks the issue tracker, label or domain configuration. Run it once per project first. |
-| [`code-review`](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review), [`implement`](https://github.com/mattpocock/skills/tree/main/skills/engineering/implement), [`tdd`](https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd) | General development skills the workers use. The task files leave the working method to the development workflow installed in the project rather than naming these skills, so install the ones your workers should use. |
+| Skill | Status | How it is used |
+| --- | --- | --- |
+| [`setup-matt-pocock-skills`](https://github.com/mattpocock/skills/tree/main/skills/engineering/setup-matt-pocock-skills) | **Bundled.** A pinned, unmodified copy ships in `skills/setup-matt-pocock-skills/`; `install.py` installs it only where you have none of your own. | Called by `ai-coding` (and so by `super-coding`) and by `live-verify` when the project is not initialized, that is, when `docs/agents/` lacks the issue tracker, label or domain configuration. Run it once per project first. |
+| [`code-review`](https://github.com/mattpocock/skills/tree/main/skills/engineering/code-review), [`implement`](https://github.com/mattpocock/skills/tree/main/skills/engineering/implement), [`tdd`](https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd) | **Recommended, not bundled.** Install separately. | General development skills the workers use. The task files leave the working method to the development workflow installed in the project rather than naming these skills, so install the ones your workers should use. |
 
 ## Quick start
 
@@ -74,9 +78,9 @@ At run time these skills call, or rely on, skills from the public [mattpocock/sk
    python3 install.py
    ```
 
-   It installs `super-coding` into `~/.claude/skills` and `~/.codex/skills` (for each of the two that exists), and installs the `ai-coding` and `live-verify` prototypes only where you have none of your own. A linked development install is left alone. Put `wfc` on your `PATH` as well.
+   It installs `super-coding` into `~/.claude/skills` and `~/.codex/skills` (for each of the two that exists), and installs `ai-coding`, `live-verify` and the bundled `setup-matt-pocock-skills` only where you have none of your own. A linked development install is left alone. Put `wfc` on your `PATH` as well.
 
-2. **Initialize the project.** If `docs/agents/` does not yet describe the issue tracker, labels and domain, run `setup-matt-pocock-skills` in the project.
+2. **Initialize the project.** If `docs/agents/` does not yet describe the issue tracker, labels and domain, run `setup-matt-pocock-skills` (installed in step 1) in the project.
 
 3. **Write the role table.** Copy the template from [skills/super-coding/references/roles.md](skills/super-coding/references/roles.md) to `docs/agents/roles.md` and adapt it. If the table is missing, the controller asks you and writes your answers into it.
 
@@ -105,6 +109,7 @@ The template in the repository is in Chinese; the example above is a translation
 
 ```text
 .
+├── docs/assets/banner.png
 ├── install.py                    # installer
 ├── skills/
 │   ├── super-coding/             # the controller skill
@@ -115,6 +120,7 @@ The template in the repository is in Chinese; the example above is a translation
 │   │   └── scripts/ctl.py        # routine checks between rounds
 │   ├── ai-coding/                # pinned copy of the prototype
 │   ├── live-verify/              # forked from the skills repository, maintained here
+│   ├── setup-matt-pocock-skills/ # pinned third-party copy from mattpocock/skills
 │   └── VENDORED.md
 └── tests/
     ├── test_ctl.py               # real git, fake gh
@@ -123,7 +129,7 @@ The template in the repository is in Chinese; the example above is a translation
 
 - `skills/super-coding/references/router.md` covers dispatch, waiting, continue/resume, message handling and recovery.
 - `skills/super-coding/scripts/ctl.py` is the controller's routine checks between rounds (snapshot checks with real exit codes, candidate read-back, transcribing an offline reviewer's record, lifecycle label switch). It uses only the Python standard library, plus git and gh. The skill runs it from its own directory, so installing the skill installs the script.
-- `skills/ai-coding/` is a pinned copy of the prototype; `skills/live-verify/` was forked from the skills repository and is maintained here. See [skills/VENDORED.md](skills/VENDORED.md).
+- `skills/ai-coding/` is a pinned copy of the prototype; `skills/live-verify/` was forked from the skills repository and is maintained here; `skills/setup-matt-pocock-skills/` is a pinned, unmodified copy from mattpocock/skills. See [skills/VENDORED.md](skills/VENDORED.md).
 
 ## Relationship to workflow-core
 
@@ -145,4 +151,6 @@ To release, push a tag `v<version>`. The release workflow runs the tests, packs 
 
 ## License
 
-[MIT](LICENSE) © xmxxc. All three skills in this repository (`super-coding`, `ai-coding`, `live-verify`) are original work. The skills from mattpocock/skills listed under [Prerequisites](#skills-from-mattpocockskills) are not included; they are installed separately under their own license.
+[MIT](LICENSE) © xmxxc, for `super-coding`, `ai-coding`, `live-verify` and the rest of this repository.
+
+The bundled `skills/setup-matt-pocock-skills/` comes from [mattpocock/skills](https://github.com/mattpocock/skills) and is licensed under MIT, Copyright (c) 2026 Matt Pocock. Its license file ships beside it; the source commit, checksums and full notice are in [skills/VENDORED.md](skills/VENDORED.md). The recommended skills listed under [Prerequisites](#skills-from-mattpocockskills) are not included and keep their own license.

@@ -4,9 +4,10 @@
   python3 install.py
 
 Installs `super-coding` (replacing an earlier installed copy) into ~/.claude/skills and
-~/.codex/skills, for each of the two that exists. The prototypes it builds on, `ai-coding` and
-`live-verify`, are installed only where the user has none of their own. A linked development
-install (a symlink) is left alone. The dispatcher, `wfc`, comes from xmxxc/workflow-core.
+~/.codex/skills, for each of the two that exists. The skills it builds on, `ai-coding`,
+`live-verify` and `setup-matt-pocock-skills`, are installed only where the user has none of their
+own. A linked development install (a symlink) is left alone. The dispatcher, `wfc`, comes from
+xmxxc/workflow-core.
 """
 
 import shutil
@@ -15,7 +16,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 WORKFLOW_SKILL = "super-coding"
-PROTOTYPES = ("ai-coding", "live-verify")
+PROTOTYPES = ("ai-coding", "live-verify", "setup-matt-pocock-skills")
 
 
 def install_skill(name, target, replace):
