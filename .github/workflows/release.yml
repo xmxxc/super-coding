@@ -21,7 +21,7 @@ jobs:
         run: |
           name="super-coding-${GITHUB_REF_NAME#v}"
           mkdir -p "dist/${name}"
-          cp -r skills install.py README.md "dist/${name}/"
+          cp -r skills install.py README.md README.zh-CN.md LICENSE "dist/${name}/"
           tar -C dist -czf "dist/${name}.tar.gz" "${name}"
           (cd dist && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256")
       - name: Publish the release
