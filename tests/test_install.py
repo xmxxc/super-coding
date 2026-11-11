@@ -1,6 +1,7 @@
 """Tests for install.py through its command line, against a throwaway HOME."""
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -108,6 +109,47 @@ class Install(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("differs", result.stdout)
         self.assertIn(f"{skills / 'setup-matt-pocock-skills'}: left alone (already installed)\n", result.stdout)
+
+    def link_to_own_copy(self, skills, name):
+        """Link `skills/name` to the user's own copy of the bundled skill; returns the copy."""
+        own = self.home / "own" / name
+        shutil.copytree(ROOT / "skills" / name, own)
+        skills.mkdir(parents=True, exist_ok=True)
+        (skills / name).symlink_to(own)
+        return own
+
+    def test_a_linked_skill_that_differs_from_the_bundled_copy_is_reported_and_left_alone(self):
+        skills = self.home / ".claude" / "skills"
+        for name in ("live-verify", "setup-matt-pocock-skills"):
+            own = self.link_to_own_copy(skills, name)
+            (own / "SKILL.md").write_text(f"the user's own {name}\n")
+
+        result = self.run_install()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for name in ("live-verify", "setup-matt-pocock-skills"):
+            own = self.home / "own" / name
+            self.assertTrue((skills / name).is_symlink())
+            self.assertEqual(os.readlink(skills / name), str(own))
+            self.assertEqual((own / "SKILL.md").read_text(), f"the user's own {name}\n")
+            self.assertEqual(sorted(p.name for p in own.iterdir()),
+                             sorted(p.name for p in (ROOT / "skills" / name).iterdir()))
+            line = next(l for l in result.stdout.splitlines() if l.startswith(f"{skills / name}:"))
+            self.assertIn("left alone (a linked development install)", line)
+            self.assertIn("differs from the bundled copy in SKILL.md;", line)
+            self.assertIn(str(ROOT / "skills" / name), line)
+
+    def test_a_linked_skill_identical_to_the_bundled_copy_is_not_reported(self):
+        skills = self.home / ".claude" / "skills"
+        for name in ("live-verify", "setup-matt-pocock-skills"):
+            self.link_to_own_copy(skills, name)
+
+        result = self.run_install()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("differs", result.stdout)
+        for name in ("live-verify", "setup-matt-pocock-skills"):
+            self.assertIn(f"{skills / name}: left alone (a linked development install)\n", result.stdout)
 
     def test_a_second_install_replaces_the_workflow_skill(self):
         skills = self.home / ".claude" / "skills"

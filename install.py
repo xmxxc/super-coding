@@ -6,9 +6,10 @@
 Installs `super-coding` (replacing an earlier installed copy) into ~/.claude/skills and
 ~/.codex/skills, for each of the two that exists. The bundled `live-verify` and
 `setup-matt-pocock-skills` are installed only where the user has none of their own; a kept copy
-that differs from the bundled one is reported, never overwritten. A linked development install (a
-symlink) is left alone. An `ai-coding` from an earlier release is kept, with a note that
-super-coding no longer depends on it. The dispatcher, `wfc`, comes from xmxxc/workflow-core.
+that differs from the bundled one, directory or link, is reported, never overwritten. A linked
+development install (a symlink) is left alone. An `ai-coding` from an earlier release is kept, with
+a note that super-coding no longer depends on it. The dispatcher, `wfc`, comes from
+xmxxc/workflow-core.
 """
 
 import shutil
@@ -32,18 +33,26 @@ def drift(name, installed):
     return sorted(path for path in ours.keys() | theirs.keys() if ours.get(path) != theirs.get(path))
 
 
+def left_alone(name, destination, why, compare):
+    """The report for a skill left as it is; when `compare`, it names files that differ from ours."""
+    report = f"{destination}: left alone ({why})"
+    if not compare or not destination.is_dir():
+        return report
+    changed = drift(name, destination)  # reads only, through a link too
+    if not changed:
+        return report
+    shown = ", ".join(changed[:5]) + (f" and {len(changed) - 5} more" if len(changed) > 5 else "")
+    return (f"{report}; it differs from the bundled copy in {shown}; "
+            f"compare it with {HERE / 'skills' / name} and update it yourself if needed")
+
+
 def install_skill(name, target, replace):
     """Install one skill into `target`. Returns what happened, for the report."""
     destination = target / name
     if destination.is_symlink():
-        return f"{destination}: left alone (a linked development install)"
+        return left_alone(name, destination, "a linked development install", compare=not replace)
     if destination.exists() and not replace:
-        changed = drift(name, destination)
-        if not changed:
-            return f"{destination}: left alone (already installed)"
-        shown = ", ".join(changed[:5]) + (f" and {len(changed) - 5} more" if len(changed) > 5 else "")
-        return (f"{destination}: left alone (already installed); it differs from the bundled copy in "
-                f"{shown}; compare it with {HERE / 'skills' / name} and update it yourself if needed")
+        return left_alone(name, destination, "already installed", compare=True)
     staging = target / f".{name}.install-new"
     shutil.rmtree(staging, ignore_errors=True)
     shutil.copytree(HERE / "skills" / name, staging)
