@@ -20,6 +20,15 @@ def anchors(path):
     return found
 
 
+def implicit_invocation(text):
+    """policy.allow_implicit_invocation from an agents/openai.yaml as a bool, or None if absent."""
+    section = re.search(r"^policy:[ \t]*\n((?:(?:[ \t].*)?\n)*)", text + "\n", re.MULTILINE)
+    if section is None:
+        return None
+    allow = re.search(r"^  allow_implicit_invocation:[ \t]*(true|false)[ \t]*$", section.group(1), re.MULTILINE)
+    return None if allow is None else allow.group(1) == "true"
+
+
 def documents():
     return sorted([*ROOT.glob("README*.md"), *(ROOT / "skills").rglob("*.md")])
 
@@ -40,10 +49,19 @@ class Docs(unittest.TestCase):
                 yaml = skill / "agents" / "openai.yaml"
                 self.assertTrue(yaml.is_file(), f"{yaml.relative_to(ROOT)} is missing")
                 text = yaml.read_text(encoding="utf-8")
-                allow = re.search(r"^  allow_implicit_invocation:\s*(true|false)\s*$", text, re.MULTILINE)
+                allow = implicit_invocation(text)
                 self.assertIsNotNone(allow, f"{yaml.relative_to(ROOT)} has no policy.allow_implicit_invocation")
-                self.assertEqual(allow.group(1) == "true", not disabled)
+                self.assertEqual(allow, not disabled)
                 self.assertIn(f"${skill.name}", text)
+
+    def test_the_invocation_policy_is_read_only_from_under_policy(self):
+        self.assertIs(implicit_invocation("policy:\n  allow_implicit_invocation: false\n"), False)
+        self.assertIs(implicit_invocation('interface:\n  x: "y"\npolicy:\n  allow_implicit_invocation: true\n'), True)
+        misplaced = 'interface:\n  display_name: "x"\n  allow_implicit_invocation: false\npolicy:\n  other: 1\n'
+        self.assertIsNone(implicit_invocation(misplaced))
+        self.assertIsNone(implicit_invocation('interface:\n  allow_implicit_invocation: false\n'))
+        self.assertIsNone(implicit_invocation('interface:\n  display_name: "x"\npolicy:\n'))
+        self.assertIsNone(implicit_invocation('policy:\n  nested:\n    allow_implicit_invocation: false\n'))
 
     def test_every_relative_link_resolves(self):
         broken = []
