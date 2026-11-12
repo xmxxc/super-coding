@@ -1,0 +1,6 @@
+interface:
+  display_name: "开发总控"
+  short_description: "多票据开发总控：用 wfc 派发实施和独立审查，维护账本与留痕直到放行"
+  default_prompt: "使用 $super-coding 接管指定仓库的 Issue/PR 范围，用 wfc 派发实施和独立审查，维护账本与留痕，推进到放行。"
+policy:
+  allow_implicit_invocation: false
